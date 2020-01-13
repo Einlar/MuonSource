@@ -24,15 +24,20 @@ import matplotlib.pyplot as plt
 ```{python}
 #Constants
 alpha = 0.00729735257
-me = 105.66 #MeV
-mmu = 0.511 #MeV
+mmu = 0.10566 #GeV
+me = 0.000511 #GeV
 ```
 
-**Differential cross section** ([source](http://www.physics.usu.edu/Wheeler/QFT/PicsII/QFT10Feb23Muon.pdf)), without any approximation
-$$\frac{\mathrm{d}\sigma}{\mathrm{d}\Omega} = \frac{\alpha^2}{4s} \left(1- \frac{4 m_\mu^2}{s}\right)^{1/2} \left(1- \frac{4 m_e^2}{s}\right)^{-1/2}\left( 1+ \frac{4}{s} (m_e^2 + m_\mu^2) + \left(1-\frac{4 m_e^2}{s}\right)\left(1-\frac{4 m_\mu^2}{s}\right)\cos^2\theta\right)$$
+**Differential cross section** ([source](http://www.physics.usu.edu/Wheeler/QFT/PicsII/QFT10Feb23Muon.pdf)), without any approximation, in the center of mass frame of reference, unpolarized:
+$$\frac{\mathrm{d}\sigma}{\mathrm{d}\Omega} = \frac{\alpha^2}{4s} \left(1- \frac{4 m_\mu^2}{s}\right)^{1/2} \left(1- \frac{4 m_e^2}{s}\right)^{-1/2}\left( 1+ \frac{4}{s} (m_e^2 + m_\mu^2) + \left(1-\frac{4 m_e^2}{s}\right)\left(1-\frac{4 m_\mu^2}{s}\right)\cos^2\theta^*\right)$$
 As it does not depend on $\varphi$:
-$$ \frac{\mathrm{d}\sigma}{\mathrm{d}\cos\theta} = 2 \pi \frac{\mathrm{d}\sigma}{\mathrm{d}\Omega} = \frac{n(\theta)}{j_1} $$
-where $n(\theta)$ is the number of particles scattered in $[\theta, \theta+\mathrm{d}\theta]$ per unit time and per unit angle, and $j_1$ is the incoming beam flux.
+$$ \frac{\mathrm{d}\sigma}{\mathrm{d}\cos\theta} = \int_0^{2\pi} \frac{\mathrm{d}\sigma}{\mathrm{d}\Omega} = 2 \pi \frac{\mathrm{d}\sigma}{\mathrm{d}\Omega} = \frac{n(\theta^*)}{j_1} $$
+where $n(\theta^*)$ is the number of particles scattered in $[\theta^*, \theta+\mathrm{d}\theta^*]$ per unit time and per unit angle, and $j_1$ is the incoming beam flux.
+
+So the function $\theta^* \mapsto \frac{\mathrm{d}\sigma}{\mathrm{d}\cos\theta^*}(\theta^*)$ is the distribution of muons with respect to their scattering angle in the CM.
+
+**Normalization**
+$$\sigma = \int_0^\pi \frac{\mathrm{d}\sigma}{\mathrm{d}\cos\theta^*}(\theta^*)\sin\theta^* \mathrm{d}\theta^* = \frac{4\pi \alpha^2}{3 s^3} \frac{\sqrt{1-\frac{4 m_\mu^2}{s}}}{\sqrt{1-\frac{4 m_e^2}{s}}} (2 m_e^2 + s)(2m_\mu^2 + s) $$
 
 ```{python}
 #Differential cross-section (dsigma/dcostheta) 
@@ -43,28 +48,47 @@ def beta_e(s):
     return np.sqrt(1 - 4*(me**2)/s)
 def dsigma(s, theta):
     return (2 * np.pi) * (alpha**2 / (4*s)) * (beta_mu(s) / beta_e(s)) * (1 + 4 * (me**2 + mmu**2) / s + beta_mu(s)**2 * beta_e(s)**2 * np.cos(theta)**2)
+
+def sigma(s): #total cross section (used for normalization)
+    #return (-0.00022305875225058102*np.sqrt((-44656.1424 + s)/s)* -1. * (11660.656559630399 + 22328.593442*s + 1.*s**2) * \
+    # -1.)/np.sqrt((-1.044484 + s)/s)*s**3
+    return (4 * np.pi * alpha**2) / (3 * s**3) * (beta_mu(s) / beta_e(s)) * (2 * me**2 + s) * (2 * mmu**2 + s)
+
+def dsigma_norm(s, theta):
+    return (3 * s * (4 * (me**2 + mmu**2) + s) + 3 * (-4 * me**2 + s) * (-4*mmu**2 + s) * np.cos(theta)**2) / \
+           (16 * np.pi * (2 * me**2 + s) * (2 * mmu**2 + s))
 ```
 
 **Angular plot (Center of mass)**
 
 ```{python}
-x = np.linspace(0, np.pi, 100)
+x = np.linspace(-np.pi/2, np.pi/2, 100)
 plt.xlabel("$\\theta^*$")
 plt.xticks([0, np.pi/2, np.pi], ('0', '$\\frac{\pi}{2}$', '$\\pi$'))
 plt.ylabel("$\\frac{\\mathrm{d}\\sigma}{\\mathrm{d}\\cos\\theta}$")
-plt.plot(x, dsigma(230**2, x)) #sqrt(s) = 230 MeV
+plt.plot(x, dsigma_norm(0.230**2, x)) #sqrt(s) = 230 MeV #need to fix normalization
 ```
-
-**Angular plot (laboratory frame)**
 
 ```{python}
-x = np.linspace(0, np.pi, 100)
+import scipy.integrate as integrate
 
-def thetalab(s, thetastar):
-    return np.arctan(2 * me * np.sin(thetastar) / (np.sqrt(s) * (beta_e(s) / beta_mu(s) + np.cos(thetastar))))
-
-#need theta*(theta)
+integrate.quad(lambda x: 4*dsigma_norm(0.230**2, x), 0, np.pi)
+#integrate.quad(lambda x: 2*dsigma(230**2, x) / (np.pi * sigma(230**2)), 0, np.pi)
 ```
+
+We are considering $e^+$ hitting a stationary $e^-$ target (in the laboratory frame of reference), leading to pair-production of muons:
+$$ e^+ + e^- \to \mu^- + \mu^+$$
+with $\sqrt{s}$ close to threshold. 
+
+We denote quantities computed in the center of mass (CM) frame of reference with a $^*$, while quantities without $^*$ are considered measured in the laboratory frame. Let $\beta_e^*$ be the velocity modulus of the electron (or positron) wrt the CM, and $\beta_\mu^+$ that of the muons. Let also $\beta$ be the velocity of the center of mass wrt the laboratory frame. As the electron is stationary in the laboratory, we have $\beta_{e^-} = 0$. As the same velocity in the CM frame is $\beta_e^*$, we have that the boost must be $\beta = \beta_e^*$. We can express this quantity as a function of $\sqrt{s}$. First, note that the electron 4-momenta in the CM frame are:
+$$ p_{e^\pm}^* = (\mathcal{E}_{e^\pm}^*, \pm \vec{p}_{e^+}^*); \qquad \mathcal{E}_{e^\pm}^* = \sqrt{m_e^2 + ||\vec{p}_e^*||^2}$$
+where $\vec{p}_{e^+}^*$ is the positron $3$-momentum in the CM frame. So $s$ is equal to:
+$$ s = (p_{e^-}^* + p_{e^+}^*)^2 = 4(m_e^2 + ||\vec{p}_e^*||^2) = 4 (\mathcal{E}^*_e)^2 \Rightarrow \mathcal{E}_e^* = \frac{\sqrt{s}}{2}$$
+Then:
+$$\beta^*_e = \beta = \frac{||\vec{p}_e^*||^2}{\mathcal{E}_e^*} = \frac{\sqrt{(\mathcal{E}_e^*)^2 - m_e^2}}{\mathcal{E}_e^*} = \sqrt{1- \frac{m^2_e}{(\mathcal{E}_e^*)^2}} = \sqrt{1-\frac{4 m_e^2}{s}}$$
+The same calculations can be done for the $\mu$, leading to:
+$$\beta_\mu^* = \sqrt{1-\frac{4 m_\mu^2}{s}}$$
+
 
 ```{python}
 
