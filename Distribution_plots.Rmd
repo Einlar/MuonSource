@@ -21,11 +21,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 ```
 
+# 1.  Cross-Section
+Compute the process leading-order cross section, $\sigma(\theta; \sqrt{s})$, as a function of the scattering angle $\theta$ and with the center of mass energy $\sqrt{s}$ as a parameter. Start by computing it in the center of mass system. N.B.: textbooks reports such cross section in the relativistic limit, i.e. for $\sqrt{s}\gg m_\mu$, which is clearly not the case here ($\sqrt{s}\sim 2m_\mu$)
+
 ```{python}
 #Constants
 alpha = 0.00729735257
-mmu = 0.10566 #GeV
-me = 0.000511 #GeV
+mmu = 105.66 #MeV
+me = 0.511 #MeV
 ```
 
 **Differential cross section** ([source](http://www.physics.usu.edu/Wheeler/QFT/PicsII/QFT10Feb23Muon.pdf)), without any approximation, in the center of mass frame of reference, unpolarized:
@@ -39,6 +42,10 @@ So the function $\theta^* \mapsto \frac{\mathrm{d}\sigma}{\mathrm{d}\cos\theta^*
 **Normalization**
 $$\sigma = \int_0^\pi \frac{\mathrm{d}\sigma}{\mathrm{d}\cos\theta^*}(\theta^*)\sin\theta^* \mathrm{d}\theta^* = \frac{4\pi \alpha^2}{3 s^3} \frac{\sqrt{1-\frac{4 m_\mu^2}{s}}}{\sqrt{1-\frac{4 m_e^2}{s}}} (2 m_e^2 + s)(2m_\mu^2 + s) $$
 
+
+# Angle and Momentum (CM)
+Compute and display the angle and momentum components distributions of the emerging muon pairs
+
 ```{python}
 #Differential cross-section (dsigma/dcostheta) 
 def beta_mu(s):
@@ -46,33 +53,47 @@ def beta_mu(s):
 
 def beta_e(s):
     return np.sqrt(1 - 4*(me**2)/s)
-def dsigma(s, theta):
-    return (2 * np.pi) * (alpha**2 / (4*s)) * (beta_mu(s) / beta_e(s)) * (1 + 4 * (me**2 + mmu**2) / s + beta_mu(s)**2 * beta_e(s)**2 * np.cos(theta)**2)
 
-def sigma(s): #total cross section (used for normalization)
-    #return (-0.00022305875225058102*np.sqrt((-44656.1424 + s)/s)* -1. * (11660.656559630399 + 22328.593442*s + 1.*s**2) * \
-    # -1.)/np.sqrt((-1.044484 + s)/s)*s**3
+def dsigma(s, theta):
+    return (2 * np.pi) * (alpha**2 / (4*s)) * (beta_mu(s) / beta_e(s)) * (1. + 4. * (me**2 + mmu**2) / s + beta_mu(s)**2 * beta_e(s)**2 * np.cos(theta)**2)
+
+def sigma(s):
     return (4 * np.pi * alpha**2) / (3 * s**3) * (beta_mu(s) / beta_e(s)) * (2 * me**2 + s) * (2 * mmu**2 + s)
 
 def dsigma_norm(s, theta):
-    return (3 * s * (4 * (me**2 + mmu**2) + s) + 3 * (-4 * me**2 + s) * (-4*mmu**2 + s) * np.cos(theta)**2) / \
+    return (2 * np.pi) * (3 * s * (4 * (me**2 + mmu**2) + s) + 3 * (-4 * me**2 + s) * (-4*mmu**2 + s) * np.cos(theta)**2) / \
            (16 * np.pi * (2 * me**2 + s) * (2 * mmu**2 + s))
+```
+
+```{python}
+integrate.quad(lambda x: dsigma_norm(230**2, x) * np.sin(x), 0, np.pi)
+```
+
+```{python}
+sigma(230**2)
 ```
 
 **Angular plot (Center of mass)**
 
+
+The angle distribution $f(\theta,\varphi)$ (in CM frame) is given by normalizing the differential cross-section (i.e. we focus only on the exiting muons):
+$$f(\theta^*,\varphi^*) = \frac{1}{\sigma} \frac{\mathrm{d}\sigma}{\mathrm{d}\Omega}$$
+We can find the marginal distributions by integration:
+$$g(\theta^*) = \frac{\mathrm{d}\sigma}{\mathrm{d}\theta^*} = \int_0^{2\pi} \mathrm{d}\varphi^* \frac{1}{\sigma} \frac{\mathrm{d}\sigma}{\mathrm{d}\Omega} \sin\theta^* = \frac{2\pi \sin\theta^*}{\sigma} \frac{\mathrm{d}\sigma}{\mathrm{d}\Omega}; \qquad h(\varphi^*) = \int_0^\pi \sin(\theta^*)\mathrm{d}{\theta^*} \frac{\mathrm{d}\sigma}{\mathrm{d}\Omega} = \frac{1}{2\pi}$$
+(Clearly the $\varphi^*$ distribution is uniform, as the process possesses a cylindrical symmetry)
+
 ```{python}
-x = np.linspace(-np.pi/2, np.pi/2, 100)
+x = np.linspace(0, np.pi, 100)
 plt.xlabel("$\\theta^*$")
 plt.xticks([0, np.pi/2, np.pi], ('0', '$\\frac{\pi}{2}$', '$\\pi$'))
-plt.ylabel("$\\frac{\\mathrm{d}\\sigma}{\\mathrm{d}\\cos\\theta}$")
-plt.plot(x, dsigma_norm(0.230**2, x)) #sqrt(s) = 230 MeV #need to fix normalization
+plt.ylabel("$g(\\theta^*)$")
+plt.plot(x, dsigma_norm(230**2, x) * np.sin(x)) #sqrt(s) = 230 MeV #normalization fixed
 ```
 
 ```{python}
 import scipy.integrate as integrate
 
-integrate.quad(lambda x: 4*dsigma_norm(0.230**2, x), 0, np.pi)
+integrate.quad(lambda x: dsigma_norm(230**2, x) * np.sin(x), 0, np.pi)
 #integrate.quad(lambda x: 2*dsigma(230**2, x) / (np.pi * sigma(230**2)), 0, np.pi)
 ```
 
@@ -89,6 +110,22 @@ $$\beta^*_e = \beta = \frac{||\vec{p}_e^*||^2}{\mathcal{E}_e^*} = \frac{\sqrt{(\
 The same calculations can be done for the $\mu$, leading to:
 $$\beta_\mu^* = \sqrt{1-\frac{4 m_\mu^2}{s}}$$
 
+We can now compute boosts. Suppose a muon is generated at angle $\theta^*_\mu$ wrt to the beam direction in the CM. Then, in the lab, it will appear with an angle $\theta_\mu$ given by (see slide 27 [here](http://background.uchicago.edu/~whu/Courses/Ast305_10/ast305_06.pdf) for the full derivation):
+$$\tan\theta_\mu = \frac{\sin\theta^*_\mu}{\gamma \left( \cos\theta^*_\mu + \frac{\beta}{\beta^*_\mu} \right)}$$
+The maximum angle is reached when the muons are emitted orthogonally to the beam in the CM, i.e. $\theta^*_\mu = \pi/2$. Inserting the values of $\beta$ and $\beta_\mu^*$ we get:
+$$\tan\theta_\mu^{\max} = \frac{\beta_\mu^*}{\gamma \beta} = \frac{\sqrt{1-\frac{4 m_\mu^2}{s}}}{\left(\sqrt{1-1+\frac{4 m_e^2}{s}} \right)^{-1} \sqrt{1-\frac{4 m_e^2}{s}} } \approx  \frac{2 m_e}{\sqrt{s}} \sqrt{1-\frac{4 m_\mu^2}{s}} = \frac{4 m_e}{s} \sqrt{\frac{s}{4} - m_\mu^2} $$
+where we used the approximation:
+$$\sqrt{1-\frac{4 m_e^2}{s}} \approx 1 - \frac{2 m_e^2}{s} = 1 + O\left( \frac{m_e^2}{s} \right)$$
+(as $m_e^2/s \ll 1$. For example, for $\sqrt{s} = 230$MeV, we have $m_e^2/s \approx 5\times 10^{-6}$). This is formula (1) in the [paper](https://arxiv.org/pdf/1509.04454.pdf).
+
+The norm of the muon $3$-momentum as function of $\sqrt{s}$ is:
+$$||\vec{p}_\mu^*|| = \sqrt{(\mathcal{E}_\mu^*)^2 - m_\mu^2} = \sqrt{\frac{s}{4} - m_\mu^2} $$
+
+Choosing spherical coordinates with poles along the $\hat{x}$ axis:
+$$\vec{p}_\mu^* = ||\vec{p}_\mu^*|| (\cos \theta^*, \sin\theta^* \cos\varphi^*, \sin\theta^*\sin\varphi^*) $$
+The momenta distributions are given by:
+
+(Cross section in laboratory frame: [here](http://hep.itp.tuwien.ac.at/~kreuzer/qt08.pdf))
 
 ```{python}
 
