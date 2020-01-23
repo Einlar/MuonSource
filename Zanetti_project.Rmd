@@ -1,0 +1,159 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.3.2
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+from numpy import random as npr
+import pandas as pd
+```
+
+sezione d'urto
+
+
+```{python}
+m_e = 0.511 #Mev
+m_u = 105.56 #mev
+s = 230**2 #Mev
+
+def cross_section(theta,s):
+    k = (1/137)**2/(64*np.pi**2*s)*(np.sqrt(1-(4*m_u**2/s))/np.sqrt(1-(4*m_e**2/s)))
+    j = 1+4/s*(m_e**2+m_u**2)+(1-4*m_e**2/s)*(1-4*m_u**2/s)*np.cos(theta)**2
+    return (k*j)
+
+theta=np.linspace(-np.pi/2,np.pi/2)
+
+plt.plot(theta,cross_section(theta,s))
+```
+
+```{python}
+# boost 
+beta_cm = np.sqrt(1-4*m_e**2/s)  #beta dell'elltrone nel cm
+gamma_cm = 1/np.sqrt(1-beta_cm**2) #gamma
+beta_mu = np.sqrt(1-4*m_u**2/s) # beta del mu
+
+# momentum in cm
+p_u_cm = np.sqrt(s/4-m_u**2) #momento del mu nel centro di massa
+p_u_cm_x = p_u_cm *np.cos(theta) #momento del mu lungo l'asse x nel cm
+p_u_cm_y = p_u_cm *np.sin(theta) #momento del mu lungo l'asse y nel cm
+e_u_cm = np.sqrt(s)/2 # energia del mu nel centro di massa 
+
+# momentum in lab 
+p_ux = gamma_cm * (p_u_cm*np.cos(theta)+beta_cm*e_u_cm)/1000 # momento del mu lungo l'asse x nel lab
+p_uy = p_u_cm*np.sin(theta)/1000                             # momento del mu lungo l'asse y nel lab
+p_lab_u = np.sqrt(p_uy**2+p_ux**2)                           #modulo del momento in gev
+
+# angle in lab
+theta_lab = np.arctan(np.sin(theta)/(gamma_cm*(np.cos(theta)+beta_cm/beta_mu ))) # angolo nel lab 
+
+```
+
+grafici
+
+```{python}
+fig, ( (ax1,ax2), (ax3, ax4) ) = plt.subplots(nrows=2, ncols=2, figsize=(15, 10),)
+
+
+# momento nel cm lungo x
+ax1.plot (theta, p_u_cm_x)
+ax1.set_title ('$\\vec{p}_\mu\,_x^* $ vs $\\theta^*$ ',fontsize=18)
+ax1.set_xlabel ('$\\theta^*$ [°]',fontsize=15)
+ax1.set_ylabel ('$\\vec{p}_\mu\,_x^* $ [Mev]', fontsize=15)
+
+# momento nel cm lungo y
+ax2.plot (theta, p_u_cm_y)
+ax2.set_title ('$\\vec{p}_\mu\,_y^* $ vs $\\theta^*$ ',fontsize=18)
+ax2.set_xlabel ('$\\theta^*$ [°]',fontsize=15)
+ax2.set_ylabel ('$\\vec{p}_\mu\,_y^* $ [Mev]', fontsize=15)
+
+# momento nel lab lungo x
+ax3.plot (theta, p_ux)
+ax3.set_title ('$\\vec{p}_\mu\,_x $ vs $\\theta^*$ ',fontsize=18)
+ax3.set_xlabel ('$\\theta^*$ [°]',fontsize=15)
+ax3.set_ylabel ('$\\vec{p}_\mu\,_x $ [Gev]', fontsize=15)
+
+# momento nel lab lungo y
+ax4.plot (theta, p_uy)
+ax4.set_title ('$\\vec{p}_\mu\,_y $ vs $\\theta^*$ ',fontsize=18)
+ax4.set_xlabel ('$\\theta^*$ [°]',fontsize=15)
+ax4.set_ylabel ('$\\vec{p}_\mu\,_y $ [Gev]', fontsize=15)
+
+# angolo nel lab 
+fig, ( ax5 ) = plt.subplots(nrows=1, ncols=1, figsize=(10, 5))
+ax5.plot (theta,theta_lab)
+ax5.set_title ('$\\theta $ vs $\\theta^*$ ',fontsize=18)
+ax5.set_xlabel ('$\\theta^*$ [°]',fontsize=15)
+ax5.set_ylabel ('$\\theta $ [°]', fontsize=15)
+```
+
+montecarlo 
+
+```{python}
+def cdf(x,s): #cdf 
+    c = (1/137)**2/(64*np.pi**2*s)*(np.sqrt(1-(4*m_u**2/s))/np.sqrt(1-(4*m_e**2/s)))
+    j = x+4/s*(m_e**2+m_u**2)*x+(1-4*m_e**2/s)*(1-4*m_u**2/s)*(0.5*np.sin(x)*np.cos(x)+x/2)
+    return (c*j)
+
+#Monte carlo rejaction method 
+n=10**6
+np.random.seed(20091994)
+
+u = np.random.uniform(-np.pi/2, np.pi/2 ,n)
+r = np.random.uniform(0,max(cross_section(theta,s)),n)
+theta_montecarlo = u[r < cross_section(u,230**2)]
+
+```
+
+grafico montecarlo
+
+```{python}
+plt.figure(figsize=(8,4))
+
+
+plt.plot(theta,cross_section(theta,s),linewidth=2)
+
+factor = cdf(np.pi,230**2)-cdf(0,230**2)
+hist, bin_edges = np.histogram(theta_montecarlo, bins=30, density=True)
+bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.
+plt.step(bin_centers, factor*hist, linewidth=2)
+```
+
+momentio del mu simulato
+
+
+$\vec{p}_\mu\,_y^+ $
+
+```{python}
+tri_momenta = pd.DataFrame(
+    { '$\\vec{p}_\mu\,_x^- [Gev] $' : gamma_cm * (p_u_cm*np.cos(theta_montecarlo)+beta_cm*e_u_cm)/1000,
+      '$\\vec{p}_\mu\,_y^- [Gev]$' : p_u_cm*np.sin(theta_montecarlo)/1000  ,
+      '$\\vec{p}_\mu\,_z^- [Gev]$' : 0,
+      '$\\vec{p}_\mu\,_x^+ [Gev]$' : gamma_cm * (p_u_cm*np.cos(-theta_montecarlo)+beta_cm*e_u_cm)/1000,
+      '$\\vec{p}_\mu\,_y^+ [Gev]$' : p_u_cm*np.sin(-theta_montecarlo)/1000,
+      '$\\vec{p}_\mu\,_z^+ [Gev]$' : 0,
+     
+    },
+    index=(theta_montecarlo)
+    )
+    
+tri_momenta
+```
+
+```{python}
+
+```
+
+```{python}
+
+```

@@ -1,0 +1,669 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.3.2
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+# Simulation of a positron-induced Muon Source
+
+Ardino Rocco, Manzali Francesco, Paccagnella Andrea, Valente Alessandro
+
+
+# Index <a class="anchor" id="Report.index"></a>
+
+1. [Description and Relevant formulas](#Report.1)
+2. [Monte Carlo with monochromatic beam](#Report.2)
+3. [Beryllium target statistics](#Report.3)
+4. [Monte Carlo with non-monochromatic beam](#Report.4)
+5. [Tracking detector statistics](#Report.5)
+
+<!-- #region -->
+# 1. Description and Relevant formulas <a class="anchor" id="#Report.1"></a>
+<div style="text-align: right"><a href="#Report.index">Return to index</a></div>
+
+The main goal of this project is to produce a Monte Carlo simulation for the scattering $e^+ + e^- \to \mu^+ + \mu^-$, with $\sqrt{s} \sim 2 m_\mu$ close to the muon production threshold. 
+
+In the following, all quantities denoted with a star ($^*$) are measured in the center of mass (CM) frame of reference, while quantities without it refer to the laboratory frame. Also, $c=1$ for all computations.
+
+The leading-order **differential cross-section** for the unpolarized scattering $e^+ + e^- \to \mu^+ + \mu^-$ in the CM frame has the following expression [[1]](#quotes.diffcross), as function of the total energy $\sqrt{s}$ in the CM frame, and the emission angles $\theta^*$ and $\Omega^*$:
+$$\frac{\mathrm{d}\sigma^*}{\mathrm{d}\Omega^*}(\sqrt{s},\theta^*, \varphi^*) = \frac{\alpha^2}{4s} \left(1- \frac{4 m_\mu^2}{s}\right)^{1/2} \left(1- \frac{4 m_e^2}{s}\right)^{-1/2}\left( 1+ \frac{4}{s} (m_e^2 + m_\mu^2) + \left(1-\frac{4 m_e^2}{s}\right)\left(1-\frac{4 m_\mu^2}{s}\right)\cos^2\theta^*\right) \label{eqn:diff-cross}\tag{1.1}$$
+Integration over the sphere leads to the **total cross section**:
+$$\sigma^*(\sqrt{s}) = \int_0^\pi \sin\theta^* \mathrm{d}\theta^* \int_0^{2\pi} {\rm d}\varphi^* \frac{\mathrm{d}\sigma^*}{\mathrm{d}\Omega^*}(\sqrt{s},\theta^*,\varphi^*) = \frac{4\pi \alpha^2}{3 s^3} \frac{\sqrt{1-\frac{4 m_\mu^2}{s}}}{\sqrt{1-\frac{4 m_e^2}{s}}} (2 m_e^2 + s)(2m_\mu^2 + s) \label{eqn:cross}\tag{1.2}$$
+
+For a fixed energy $\sqrt{s}$, the angle distribution $f(\theta^*, \varphi^*)$ of the scattered particles is given by normalizing the differential cross-section:
+$$f(\theta^*,\varphi^*) = \frac{1}{\sigma} \frac{\mathrm{d}\sigma^*}{\mathrm{d}\Omega^*} (\sqrt{s}, \theta^*, \varphi^*) \label{eqn:angular}\tag{1.3}$$
+
+As the scattering process possesses cylindrical symmetry, the differential cross section does not depend on $\varphi^*$. This means that $f(\theta^*, \varphi^*)$ can be factored into two independent **angular distributions**, $g(\theta^*)$ for the $\theta^*$ angle, and a uniform $h(\varphi^*)$ for the $\varphi^*$ angle:
+$$g(\theta^*) = \frac{\mathrm{d}\sigma^*}{\mathrm{d}\theta^*} = \int_0^{2\pi} \mathrm{d}\varphi^* \frac{1}{\sigma^*} \frac{\mathrm{d}\sigma^*}{\mathrm{d}\Omega^*} \sin\theta^* = \frac{2\pi \sin\theta^*}{\sigma^*} \frac{\mathrm{d}\sigma^*}{\mathrm{d}\Omega^*}; \qquad h(\varphi^*) = \int_0^\pi \sin(\theta^*)\mathrm{d}{\theta^*} \frac{\mathrm{d}\sigma^*}{\mathrm{d}\Omega^*} = \frac{1}{2\pi} \label{eqn:gh}\tag{1.4}$$
+
+We consider the $e^-$ stationary in the laboratory frame, so that $\beta_{e^-} = 0$. This means that the velocity $\beta$ of the CM frame with respect to the laboratory is $\beta = \beta^*_{e^-}$. We can express it as a function of $\sqrt{s}$ as follows. First, note that the electron/positron $4$-momenta in the CM frame are:
+$$ p_{e^\pm}^* = (\mathcal{E}_{e^\pm}^*, \pm \vec{p}_{e^+}^*); \qquad \mathcal{E}_{e^\pm}^* = \sqrt{m_e^2 + ||\vec{p}_e^*||^2}$$
+where $\vec{p}_{e^+}^*$ is the positron $3$-momentum in the CM frame.
+
+
+So $s$ is equal to:
+$$ s = (p_{e^-}^* + p_{e^+}^*)^2 = 4(m_e^2 + ||\vec{p}_e^*||^2) = 4 (\mathcal{E}^*_e)^2 \Rightarrow \mathcal{E}_e^* = \frac{\sqrt{s}}{2} \label{eqn:Ee}\tag{1.5}$$
+Then:
+$$\beta^*_e = \beta = \frac{||\vec{p}_e^*||^2}{\mathcal{E}_e^*} = \frac{\sqrt{(\mathcal{E}_e^*)^2 - m_e^2}}{\mathcal{E}_e^*} = \sqrt{1- \frac{m^2_e}{(\mathcal{E}_e^*)^2}} = \sqrt{1-\frac{4 m_e^2}{s}} \label{eqn:betae}\tag{1.6}$$
+<!-- #endregion -->
+
+The same calculations can be done for the $\mu^{\pm}$, leading to:
+$$\beta_{\mu^\pm}^* = \sqrt{1-\frac{4 m_\mu^2}{s}} \label{eqn:betamu}\tag{1.7}$$
+Then, the norm of the muon $3$-momentum as function of $\sqrt{s}$ is:
+$$||\vec{p}_\mu^*|| = \sqrt{(\mathcal{E}_\mu^*)^2 - m_\mu^2} = \sqrt{\frac{s}{4} - m_\mu^2} \label{eqn:pmu}\tag{1.8} $$
+
+Knowing $\sqrt{s}$, $\theta^*$ and $\varphi^*$ uniquely identifies the muon $4$-momentum components:
+
+$$ p^*_\mu = \left( \frac{\sqrt{s}}{2}, \vec{p}_\mu^* \right) \qquad \vec{p}_\mu^* = ||\vec{p}_\mu^*|| (\cos \theta^*, \sin\theta^* \cos\varphi^*, \sin\theta^*\sin\varphi^*) \label{eqn:pmusphere}\tag{1.9} $$
+
+
+Finally, we can boost the angle $\theta^*$ and the $4$-momentum to the laboratory frame:
+$$\tan\theta_\mu = \frac{\sin\theta^*_\mu}{\gamma \left( \cos\theta^*_\mu + \frac{\beta}{\beta^*_\mu} \right)} \label{eqn:angleboost}\tag{1.10}$$
+
+$$ \begin{pmatrix}\mathcal{E} \\ p_x \\ p_y \\ p_z \end{pmatrix} = \begin{pmatrix} \gamma & \beta \gamma & 0 & 0 \\
+\beta \gamma & \gamma & 0 & 0 \\
+0 & 0 & 1 & 0 \\
+0 & 0 & 0 & 1 \end{pmatrix} \begin{pmatrix} \mathcal{E}^* \\ p_x^* \\ p_y^* \\ p_z^* \end{pmatrix} \label{eqn:p-boost}\tag{1.11} $$
+
+```{python}
+#Insert formula plots (see Zanetti_project file)?
+#Need a uniform convention for axes. Here beam is along x, but in sec. 4 beam is along z.
+```
+
+```{python}
+# %matplotlib inline
+import numpy as np
+import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.interpolate import interp1d
+
+#Constants
+alpha = 0.00729735257
+mmu = 105.66 #MeV
+me = 0.511 #MeV
+
+#Cross-section
+def dsigma(s, theta):
+    """Differential cross-section (1) [MeV^-2 sr^-1]"""
+    return (alpha**2 / (4*s)) * (beta_mu(s) / beta_e(s)) * (1. + 4. * (me**2 + mmu**2) / s + beta_mu(s)**2 * beta_e(s)**2 * np.cos(theta)**2)
+
+def sigma(s):
+    """Total cross section (2) [MeV^-2]"""
+    return (4 * np.pi * alpha**2) / (3 * s**3) * (beta_mu(s) / beta_e(s)) * (2 * me**2 + s) * (2 * mmu**2 + s)
+
+#Distributions
+def g(s, theta):
+    """Distribution for theta* [First. eq. in (4)]"""
+    
+    return (2 * np.pi) * np.sin(theta) * (3 * s * (4 * (me**2 + mmu**2) + s) + 3 * (-4 * me**2 + s) * (-4*mmu**2 + s) * np.cos(theta)**2) / \
+           (16 * np.pi * (2 * me**2 + s) * (2 * mmu**2 + s))
+
+def g_cdf(s, theta):
+    """CDF for the theta* distribution"""
+    
+    return (4 * (2 * me**2 + s) * (2 * mmu**2 + s) - 3 * s * (4 * me**2 + 4 * mmu**2 + s) * np.cos(theta) + (4 * me**2 - s) * (-4 * mmu**2 + s) * np.power(np.cos(theta),3)) / \
+           (8 * (2 * me**2 + s) * (2 * mmu**2 + s))
+
+#Kynematics functions
+def beta_mu(s):
+    """beta_mu* (eq. 7)"""
+    return np.sqrt(1 - 4*(mmu**2)/s)
+
+def beta_e(s):
+    """beta_e* = beta (eq. 6)"""
+    return np.sqrt(1 - 4*(me**2)/s)
+
+def gamma_e(s):
+    """gamma_e^* = gamma"""
+    return 1 / np.sqrt(1 - beta_e(s)**2)
+
+def p_mu_cm(s):
+    """Norm of muon 3-momentum in CM (eq. 8)"""
+    return np.sqrt(s/4 - mmu**2)
+
+#Boosts
+def theta_boost(s, theta_cm):
+    """Converts theta* (measured in CM) for a muon into tan(theta) (measured in laboratory)"""
+    
+    return np.sin(theta_cm) / \
+           (gamma_e(s) * (np.cos(theta_cm) + beta_e(s)/beta_mu(s)))
+
+def energy_x_boost(s, x_cm):
+    """Boosts E* => E, and x^* => x (from CM to lab frame), with the following formula:
+        E = gamma * ( E_cm        + beta * x_cm )
+        x = gamma * ( beta * E_cm + x_cm        )
+        with beta = beta_e(s), and E_cm = sqrt(s)/2
+    """
+    
+    E_cm  = np.sqrt(s) / 2
+    gamma = gamma_e(s)
+    beta  = beta_e(s)
+    
+    return (gamma * ( E_cm + beta * x_cm ), gamma * (beta * E_cm + x_cm))
+
+#Utility
+def to_cartesian(norm, theta, phi):
+    """Returns cartesian components of 3-vector (eq. 9)"""
+    sintheta = np.sin(theta)
+    return (norm * np.cos(theta), norm * sintheta * np.cos(phi), norm * sintheta * np.sin(phi))
+```
+
+```{python}
+#Plots
+from matplotlib import rc
+#rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+## for Palatino and other serif fonts use:
+rc('font',**{'family':'serif','serif':['Palatino']}) #need to install the font
+rc('xtick', labelsize='small')
+rc('ytick', labelsize='small')
+rc('axes', titlesize='large', labelsize='medium')
+
+gratio = (np.sqrt(5) - 1)/2
+
+sqrs = 214 #fix center of mass energy to 230 MeV
+s = sqrs**2
+
+#Compute inverse CDF of g(theta*) by interpolation
+xs = np.linspace(0, np.pi, 1000)
+inv_cdf = interp1d(g_cdf(230**2, xs), xs, fill_value="extrapolate") #need to extrapolate for extrema values (z = 0,1)
+
+#Sample some angles
+num_samples = 500000
+unif_samples = np.random.uniform(size=num_samples)
+thetas = inv_cdf(unif_samples)
+phis   = np.random.uniform(0, 2 * np.pi, size=num_samples)
+
+p_norm = p_mu_cm(s)
+
+#Theta
+fig, ax = plt.subplots(1, 1, figsize=(8,6))
+sns.distplot(thetas, kde_kws={'kernel': 'gau', 'label': 'KDE'}, hist_kws={'label': 'Hist'}, ax=ax)
+ax.set_title(r"$\theta^*$")
+plt.legend()
+```
+
+For every event, two muons are generated, with opposite angles $\theta^*_1 = -\theta^*_2$ and $\varphi^*_1 = - \varphi^*_2$. By symmetry, the distribution of their $3$-momentum components are the same. Also, as the process is cylindrically symmetric, the distributions for $p_y^*$ and $p_z^*$ are the same.
+
+```{python}
+#Momentum CM
+fig, (a_px, a_py) = plt.subplots(1, 2, figsize=(10, 10*gratio/2))
+
+a_px.set_title("$p_x^*$")
+a_px.set_xlabel("MeV")
+a_px.set_ylabel("PDF")
+px_cm = p_norm * np.cos(thetas)
+sns.distplot(px_cm, ax=a_px)
+
+a_py.set_title("$p_y^*$, $p_z^*$")
+a_py.set_xlabel("MeV")
+a_py.set_ylabel("PDF")
+sns.distplot(p_norm * np.sin(thetas) * np.cos(phis), ax=a_py)
+
+```
+
+```{python}
+#Angle (laboratory)
+ths_cm_boosted = theta_boost(s, thetas)
+ths_cm_boosted2 = theta_boost(s, -thetas)
+
+ax = sns.distplot(ths_cm_boosted)
+ax.set_title("Angle distribution (lab)")
+ax.set_xlabel(r"$\tan\>\theta$")
+ax.set_ylabel(r"pdf($\tan\>\theta$)")
+```
+
+The momentum distributions $p_y$ and $p_z$ are the same as the ones for $p_y^*$ and $p_z^*$, as they are orthogonal to the boost axis. So, the only interesting distributions are that of energy and $p_x$.
+
+```{python}
+#Momentum boost
+E_cm = sqrs / 2
+E_mu_lab1  = gamma_e(s) * (E_cm  - px_cm*beta_e(s))
+E_mu_lab2 = gamma_e(s) * (E_cm  + px_cm*beta_e(s))
+px_mu_lab = gamma_e(s) * (px_cm + E_cm *beta_e(s))
+```
+
+```{python}
+sns.distplot(E_mu_lab)
+```
+
+```{python}
+sns.distplot(px_mu_lab)
+```
+
+```{python}
+#TO DO: Sistemare i plot precedenti (labels, impaginazione, etc.)
+#Aggiungere confronto con plot di babayaga
+```
+
+## Esperimenti (plot a caso per verificare robe, saranno poi rimossi)
+
+```{python}
+sns.jointplot(x=E_mu_lab1/1000, y=ths_cm_boosted*100, kind="hex", ylim=(0,0.5), 
+              xlim=(10,30), joint_kws=dict(gridsize=10), bins='log')
+```
+
+```{python}
+from matplotlib.colors import LogNorm
+```
+
+```{python}
+plt.hist2d(E_mu_lab1/1000, ths_cm_boosted*100, norm=LogNorm(), bins=(150,150), range=[[0,30],[0,0.5]])
+plt.show() #viene un po' troppo "sottile"
+```
+
+```{python}
+ss = np.linspace(211.5, 230, 100)
+plt.plot(ss,sigma(ss**2) * 389.4 * 1e6) #questo viene come nel paper
+```
+
+```{python}
+def theta_max(s):
+    return 4 * me / s * np.sqrt(s/4 - mmu**2)
+
+print(theta_max(s))
+
+print(np.max(ths_cm_boosted))
+
+#vengono diverse, ma non di molto. L'approssimazione è migliore per sqrt(s) vicini alla soglia. Non dovrebbe essere un problema
+```
+
+# 2. Monte Carlo with monochromatic beam <a class="anchor" id="Report.2"></a>
+<div style="text-align: right"><a href="#Report.index">Return to index</a></div>
+
+
+```{python}
+def generate_monochromatic(sqrs, batch_size=1000):
+    """Generate one batch of scattering statistics
+    
+    Parameters
+    ----------
+    sqrs : float
+           Center of mass energy (sqrt(s)) in MeV (must be > 2 mmu)
+           
+    batch_size : int, optional
+                 Number of events to generate in one batch
+                 
+                 
+    Returns
+    -------
+    batch : ndarray of size (batch_size, 6)
+            Each row is one event, and contains the components of the 3-momenta (in the laboratory frame)
+            of the muon-antimuon pair, in [MeV/c]
+    """
+    
+    assert sqrs > 2 * mmu, "Not enough energy for muon production"
+    
+    s = sqrs**2
+    pnorm = p_mu_cm(s)
+    
+    #Compute inverse CDF of g(theta*) by interpolation
+    xs = np.linspace(0, np.pi, 1000)
+    inv_cdf = interp1d(g_cdf(s, xs), xs, fill_value="extrapolate") #"extrapolate" is needed for the points at z=0,1, which are "very slightly" outside of the samples
+    
+    unif_samples = np.random.uniform(size=batch_size)
+    thetas = inv_cdf(unif_samples)
+    phis   = np.random.uniform(0, 2 * np.pi, size=batch_size)
+
+    px_cm, py_cm, pz_cm = to_cartesian(pnorm, thetas, phis)
+    
+    _, px1 = energy_x_boost(s, px_cm)  #px for first muon
+    _, px2 = energy_x_boost(s, -px_cm) #px for second muon
+    
+    return np.stack((px1, py_cm, pz_cm, px2, -py_cm, -pz_cm), axis=1) #py and pz are orthogonal to boost axis, and so they remain the same
+```
+
+```{python}
+events = generate_monochromatic(230, 100000)
+np.savetxt("Momenta_monochromatic.txt", events) #save to file
+```
+
+# 3. Beryllium target statistics <a class="anchor" id="Report.3"></a>
+<div style="text-align: right"><a href="#Report.index">Return to index</a></div>
+
+
+**Previous**
+The differential cross section definition comes from
+
+$$\frac{N_S}{T}=\sigma \phi_1 N_2 $$
+
+Where $N_S$ is the number of scattered events, T the time $\sigma$ the cross section $phi$ the incident particle flux and $N_2$ the number of target particles. We know that $N_2 =n_2V$ wher V is the volume and $n_2$ the numeric density of particles.
+
+Then is we suppose an ideal beam that is concetrated in a point we can assume that the section of interaction is the area of a berillium atom, we also know the lenght of the target so $V=\pi r_{Be}^2L_T$.
+
+The numeric density is 
+$$n_2= \frac{\rho_{Be}}{M_{Be}}N_A$$ 
+where $\rho$ is the density and $M$ the atomic mass (equal to the molar mass)
+
+The the number of events over time becomes
+$$\frac{N_S}{T}=3\sigma \phi_1\frac{\rho_{Be}}{M_{Be}}N_AL_T\pi r_{Be}^2L_T$$
+
+Where the 3 factor comes from the fact that every atom has 3 electrons which the positron can interact with
+
+```{python}
+import math
+
+sigma = 0.921785e-30 #cm -> e-30cm = ub
+phi = 10**6 #Hz
+rhoBe = 1.848 #g/cm3
+MBe = 9.012 #g/mol
+#rBe = 112e-10 #cm -> e-10cm = pm
+rBe=1 #cm
+LT = 6 #cm
+NA= 6.022e22 #1/mol
+T= 3600*24*7 #secondi in una settimana
+
+#calcoliamo il rate di eventi al secondo
+Ns_T= 3*sigma*phi*rhoBe*NA*LT*math.pi*(rBe**2)/MBe
+Ns=Ns_T*T
+```
+
+```{python}
+print("events per second", Ns_T)
+print("events in a week ", Ns)
+```
+
+**New**
+Let $f_+$ be the rate of positrons on target. Then, the rate $f_\mu$ of muon pairs produced by the interaction is given by:
+$$f_\mu =  f_+ \rho^- l_t \sigma $$
+where $\rho^-$ is the electron density in the medium, $l_t$ is the thickness of the target, and $\sigma$ is the total cross section for the $e^+ e^- \to \mu^+ \mu^-$ interaction. $\rho^-$ can be computed as:
+$$ \rho^- = N_A \frac{\rho}{M_t} Z $$
+with $\rho$ being the target's density, $M_t$ its molar mass, and $Z$ its atomic number.
+
+So, if we generate $N$ events, the correct statistics for an experiment lasting $\Delta T$ can be computed by rescaling histograms by a factor $f_\mu \Delta T / N$.
+
+```{python}
+s     = 230**2 
+cross_sec = sigma(s) * 389.4 * 1e-24 #Total cross section [cm^-2]
+
+fp    = 1e6      #Positron rate on target [Hz]
+rhoBe = 1.848    #Beryllium density     [g/cm^3]
+MBe   = 9.012    #Beryllium molar mass  [g/mol]
+ZBe   = 4        #Beryllium atomic number
+Lt    = 6        #Target thickness      [cm]
+NA    = 6.022e22 #Avogadro's number  [mol^-1]
+
+T     = 3600 * 24 * 7 #number of seconds in a week
+
+rho_electrons = NA * rhoBe * ZBe / MBe
+fmu    = fp * rho_electrons * Lt * cross_sec #rate of produced muon pairs [Hz]
+N_week = fmu * T #Number of muons produced in a week
+
+print("Muon pairs produced per second: ", fmu)
+print("Muon pairs produced in a week: ", N_week)
+```
+
+# 4. Monte Carlo with non-monochromatic beam <a class="anchor" id="Report.4"></a>
+<div style="text-align: right"><a href="#Report.index">Return to index</a></div>
+
+We consider now a non-monochromatic beam with a uniform transverse spread. In the laboratory frame, positrons arrive at the target with energy $\mathcal{E}$ and transverse coordinates $y$, $z$ sampled from the distributions:
+
+$$
+g(y,z; r) =
+\begin{cases}
+    \dfrac{1}{\pi r^2} & (y,z) \ \text{s.t.} \ y^2 + z^2 \le r^2 \\
+    0 & \text{otherwise}
+\end{cases}
+\qquad
+h(\mathcal{E}; \mu,\sigma) = \dfrac{1}{\sqrt{2\pi}\sigma} \exp\left({ - \dfrac{(\mathcal{E}-\mu)^2}{2\sigma^2} }\right)
+\label{eqn:hg-dist}\tag{4.1}
+$$
+
+with $r=1\,{\rm cm}$, $\mu$ being the nominal beam energy (here $52.9\,{\rm GeV}$) and $\sigma = 0.5\,{\rm GeV}$.
+
+
+## 4.1. Data generation
+
+```{python}
+def generate(N, r, mu, sigma, batch_size=10000):
+    """Generates (y,z) and E according to the g and h distributions (4.1). Uses rejection sampling for (y,z)
+    (inverse transform is possible, but in this case rejection sampling is computationally faster)
+    
+    Parameters
+    ----------
+    N : int 
+       Number of samples to generate
+    r : float
+       Radius for the transverse uniform distribution
+    mu, sigma : float
+       Parameters for the gaussian energy distribution
+    batch_size : int, optional
+       Random sampling is done in batches of this size, to increase performance
+       
+    Returns
+    -------
+    y, z, E : tuple of ndarrays
+       Sampled values for y, z and E
+    """
+    
+    generated = 0 
+    ys = np.zeros(N, dtype=float)
+    zs = np.zeros(N, dtype=float)
+    Es = np.random.normal(mu, sigma, size=N)
+    
+    while generated < N:
+        yz  = np.random.uniform(-r, r, size=(batch_size, 2))
+        radii = np.sum(np.square(yz), axis=1)
+        
+        inside = radii < r**2
+        len_inside = np.sum(inside)
+        
+        #print(len_inside)
+        ys[generated:min(generated+len_inside, N+1)] = yz[inside, 0][:min(len_inside, N-generated)]
+        zs[generated:min(generated+len_inside, N+1)] = yz[inside, 1][:min(len_inside, N-generated)]
+        
+        generated += len_inside
+    
+    return ys, zs, Es
+```
+
+```{python}
+ys, zs, Es = generate(1000000, 1, 52.9, 0.5) #without batches it would take 17s
+```
+
+```{python}
+plt.figure(figsize=(6,6))
+plt.scatter(ys,zs,s=0.00001)
+plt.xlabel('y')
+plt.ylabel('z')
+plt.show()
+```
+
+```{python}
+plt.figure(figsize=(6,6))
+plt.hist2d(ys,zs,bins=100,weights=Es)
+plt.xlabel('y')
+plt.ylabel('z')
+plt.show()
+```
+
+```{python}
+#Should be s = 2me ( me + E )
+```
+
+```{python}
+# Squared energies in center of mass in MeV
+sqrt_s = np.sqrt(Es * 2 * me * 1e3)
+```
+
+## 4.2. Distribution $g(\theta^*,s)$
+
+```{python}
+ths = np.linspace(0,np.pi,1000)
+sqs = np.linspace(np.min(sqrt_s),np.max(sqrt_s),1000)
+thsv, sqsv = np.meshgrid(ths,sqs)
+thsv = thsv.reshape(-1,)
+sqsv = sqsv.reshape(-1,)
+gs  = g(sqsv**2,thsv)
+```
+
+```{python}
+plt.figure(figsize=(7,6))
+plt.hist2d(thsv,sqsv,weights=gs, bins=100, density=True)
+plt.xlabel("$\\theta^*$")
+plt.ylabel("$\\sqrt{s}$")
+plt.colorbar()
+plt.show()
+```
+
+```{python}
+thetas = np.linspace(0,np.pi,100)
+plt.plot(thetas,g_cdf(230**2,thetas))
+plt.axhline(0, color='red')
+plt.axhline(1, color='red')
+plt.show()
+```
+
+## 4.3. Monte Carlo simulation through rejection sampling method
+
+
+It returns $N$ events with the following variables:
+* $y$: coordinate from which the particle comes out from the target.
+* $z$: coordinate from which the particle comes out from the target.
+* $E$: energy of the positron in the Lab frame (energy of the beam).
+* $\sqrt{s}$: energy in the CM frame.
+* $\theta$: azimuthal angle in the CM fram.
+* $\phi$: polar angle in the CM frame.
+
+```{python}
+k = 1.0
+def event_generator(N, r=1, E=52.9, sigma=0.5): #to be vectorized
+    ys, zs, Es = generate(N,r,E,sigma)
+    ths = np.zeros(N)
+    sqs = np.sqrt(Es/(2*me*1e-3))
+    phs = np.random.uniform(0,2*np.pi, size=N)
+    
+    i = 0
+    while i<N:
+        u = np.random.uniform(0, np.pi)
+        v = np.random.uniform(0, k)
+        if v <= g(sqs[i]**2,u)*np.sin(u):
+            ths[i] = u
+            i += 1
+            continue
+    
+    return ys, zs, Es, sqs, ths, phs
+```
+
+```{python}
+ys_cm, zs_cm, Es_cm, sqs_cm, ths_cm, phs_cm = event_generator(1000000, E=52.9, sigma=0.5)
+```
+
+```{python}
+x = np.arange(0,np.pi,0.001)
+plt.hist(ths_cm, bins=100, density=True)
+plt.plot(x, dsigma_norm_dist(230**2,x))
+plt.show()
+```
+
+```{python}
+#Add boost and plots
+```
+
+# 5. Tracking detector statistics <a class="anchor" id="Report.5"></a>
+<div style="text-align: right"><a href="#Report.index">Return to index</a></div>
+
+```{python}
+#Add pictures
+#Test if it works
+```
+
+Let's compute the variation in the the trajectory induced by the presence of a magnet, each particle is identified by it's position at the end of the berillium block and it's tri-momentum at the exit.
+
+We know that the relativistic motion in an uniform magnetic field along the z-axis has the following EOM:
+$$ 
+    \begin{cases}
+    x(t)= x_0 + \frac{|v_{pe}|}{\omega}\sin (\omega t -\alpha)\\
+    y(t)= y_0 + \frac{|v_{pe}|}{\omega}\cos (\omega t -\alpha)\\
+    z(t)= z_0 + v_{0z}t
+    \end{cases} 
+$$
+and the tri-momentum are
+$$
+    \begin{cases}
+    p_x(t)= \sqrt{p_{0x}^2+p_{0y}^2}\cos (\omega t -\alpha)\\
+    p_y(t)= \sqrt{p_{0x}^2+p_{0y}^2}\sin (\omega t -\alpha)\\
+    p_z(t)= p_{z0}
+    \end{cases} 
+$$
+
+Where
+
+$$
+\omega =\frac{qB}{m\gamma} \qquad \alpha=-arctan \frac{v_{0y}}{v_{0x}}=-arctan \frac{p_{0y}}{p_{0x}}
+$$
+
+Since the realtion between momentum and velocity is $p_i=\gamma mv_i$  we have
+$$
+v_{pe}=\sqrt{v_{0x}^2+v_{0y}^2} \implies \frac{|v_{pe}|}{\omega}=\frac{\sqrt{p_{0x}^2+p_{0y}^2}}{qB}
+$$
+
+Since we know where the position along the x axis where the magnet ends is we can compute the time travel inverting the first equation and then substitute to have the final position of the particle
+
+$$
+\omega t=\alpha + arcsen( x(\hat{t})- \frac{|v_{pe}|}{\omega})
+$$
+
+After the magnet the EOM is the one of a free particle.
+
+```{python}
+#let's put the values
+import scipy as sp
+import math
+import numpy as np
+q=1.602176634e-19 #C
+B=1.7 #T
+c=3e8 #m/s
+mmu=105.6583755
+qB=q*B #devo moltiplicare per c?
+
+```
+
+```{python}
+#this function requires 2 array one with the 3 position component and one with the momentum ones and how many meters the field is long
+#and return the final position and momentum
+def bend_particle (position, momentum, meters):
+    p=np.linalg.norm(momentum) #modulo del momento
+    beta= p/math.sqrt(p**2+mmu**2)
+    gamma=1/math.sqrt(1-beta**2)
+    alpha=-math.arctan(momentum[1]/momentum[0]) #fase nel sen e coseno
+    v_w = math.sqrt(momentum[0]**2+momentum[1]**2)*(10**6)/qB #rapporto v perperdicolare su omega, il 10^6 è perche il momento è in Mev
+    wt=alpha+math.arcsin(meters-w_w) #omega per tempo
+    final_momentum=[] #arrays for final results
+    final_position=[]
+    final_position.append(position[0]+meters) #final x position
+    final_position.append(position[1]+v_w*math.cos(wt-alpha)) #final y position
+    final_position.append(position[2]+momentum[2]*wt/qB) #final z position rewritten in terms of stuff i know
+    final_momentum.append(math.sqrt(momentum[0]**2+momentum[1]**2)*math.cos(wt-alpha)) #final x momentum
+    final_momentum.append(math.sqrt(momentum[1]**2+momentum[1]**2)*math.sin(wt-alpha)) #final y momentum
+    final_momentum.append(momentum[2]) #final z momentum
+    return final_position, final_momentum
+
+#this function requires 2 array one with the 3 position component and one with the momentum ones and how many meters it travels
+#and returns final poswition and momentum
+def free_particle(position, momentum, meters):
+    p=np.linalg.norm(momentum) #modulo del momento
+    beta= p/math.sqrt(p**2+mmu**2)
+    gamma=1/math.sqrt(1-beta**2)
+    final_position=[]
+    time=mmu*gamma*meters/momentum[0] #time travel on the x axis
+    final_position.append(position[0]+meters) #final x position
+    final_position.append(position[1]+momentum[1]*time/(mmu*gamma)) #final y position
+    final_position.append(position[2]+momentum[2]*time/(mmu*gamma)) #final z position
+```
+
+# Citations
+- [1]: Electron-positron annihilation into muon-antimuon pairs, full calculation, [link](http://www.physics.usu.edu/Wheeler/QFT/PicsII/QFT10Feb23Muon.pdf)
+
+```{python}
+
+```
