@@ -227,8 +227,8 @@ The momentum distributions $p_y$ and $p_z$ are the same as the ones for $p_y^*$ 
 ```{python}
 #Momentum boost
 E_cm = sqrs / 2
-E_mu_lab1  = gamma_e(s) * (E_cm  - px_cm*beta_e(s))
-E_mu_lab2 = gamma_e(s) * (E_cm  + px_cm*beta_e(s))
+E_mu_lab  = gamma_e(s) * (E_cm  - px_cm*beta_e(s))
+#E_mu_lab2 = gamma_e(s) * (E_cm  + px_cm*beta_e(s))
 px_mu_lab = gamma_e(s) * (px_cm + E_cm *beta_e(s))
 ```
 
@@ -352,7 +352,7 @@ Where the 3 factor comes from the fact that every atom has 3 electrons which the
 ```{python}
 import math
 
-sigma = 0.921785e-30 #cm -> e-30cm = ub
+sigma2 = 0.921785e-30 #cm -> e-30cm = ub
 phi = 10**6 #Hz
 rhoBe = 1.848 #g/cm3
 MBe = 9.012 #g/mol
@@ -363,7 +363,7 @@ NA= 6.022e22 #1/mol
 T= 3600*24*7 #secondi in una settimana
 
 #calcoliamo il rate di eventi al secondo
-Ns_T= 3*sigma*phi*rhoBe*NA*LT*math.pi*(rBe**2)/MBe
+Ns_T= 3*sigma2*phi*rhoBe*NA*LT*math.pi*(rBe**2)/MBe
 Ns=Ns_T*T
 ```
 
@@ -390,11 +390,11 @@ rhoBe = 1.848    #Beryllium density     [g/cm^3]
 MBe   = 9.012    #Beryllium molar mass  [g/mol]
 ZBe   = 4        #Beryllium atomic number
 Lt    = 6        #Target thickness      [cm]
-NA    = 6.022e22 #Avogadro's number  [mol^-1]
+NA    = 6.022e22 #Avogadro's number     [mol^-1]
 
 T     = 3600 * 24 * 7 #number of seconds in a week
 
-rho_electrons = NA * rhoBe * ZBe / MBe
+rho_electrons = NA * rhoBe * ZBe / MBe  #n.e-/cm^3
 fmu    = fp * rho_electrons * Lt * cross_sec #rate of produced muon pairs [Hz]
 N_week = fmu * T #Number of muons produced in a week
 
@@ -424,8 +424,8 @@ with $r=1\,{\rm cm}$, $\mu$ being the nominal beam energy (here $52.9\,{\rm GeV}
 ## 4.1. Data generation
 
 ```{python}
-def generate(N, r, mu, sigma, batch_size=10000):
-    """Generates (y,z) and E according to the g and h distributions (4.1). Uses rejection sampling for (y,z)
+def generate_yz(N, r, batch_size=10000):
+    """Generates (y,z) according to the g distribution (4.1). Uses rejection sampling for (y,z)
     (inverse transform is possible, but in this case rejection sampling is computationally faster)
     
     Parameters
@@ -434,21 +434,18 @@ def generate(N, r, mu, sigma, batch_size=10000):
        Number of samples to generate
     r : float
        Radius for the transverse uniform distribution
-    mu, sigma : float
-       Parameters for the gaussian energy distribution
     batch_size : int, optional
        Random sampling is done in batches of this size, to increase performance
        
     Returns
     -------
-    y, z, E : tuple of ndarrays
-       Sampled values for y, z and E
+    y, z : tuple of ndarrays
+       Sampled values for y, z
     """
     
     generated = 0 
     ys = np.zeros(N, dtype=float)
     zs = np.zeros(N, dtype=float)
-    Es = np.random.normal(mu, sigma, size=N)
     
     while generated < N:
         yz  = np.random.uniform(-r, r, size=(batch_size, 2))
@@ -463,11 +460,11 @@ def generate(N, r, mu, sigma, batch_size=10000):
         
         generated += len_inside
     
-    return ys, zs, Es
+    return ys, zs
 ```
 
 ```{python}
-ys, zs, Es = generate(1000000, 1, 52.9, 0.5) #without batches it would take 17s
+ys, zs = generate_yz(1000000, 1) #without batches it would take 17s
 ```
 
 ```{python}
@@ -480,7 +477,7 @@ plt.show()
 
 ```{python}
 plt.figure(figsize=(6,6))
-plt.hist2d(ys,zs,bins=100,weights=Es)
+plt.hist2d(ys, zs, bins=100, weights=Es)
 plt.xlabel('y')
 plt.ylabel('z')
 plt.show()
@@ -511,15 +508,19 @@ plt.figure(figsize=(7,6))
 plt.hist2d(thsv,sqsv,weights=gs, bins=100, density=True)
 plt.xlabel("$\\theta^*$")
 plt.ylabel("$\\sqrt{s}$")
-plt.colorbar()
+plt.colorbar() #See that maximum is fixed at theta = pi/2 for the entire range (or it is really close to it)
 plt.show()
 ```
 
 ```{python}
+g(230**2, np.pi/2)
+```
+
+```{python}
 thetas = np.linspace(0,np.pi,100)
-plt.plot(thetas,g_cdf(230**2,thetas))
+plt.plot(thetas,g(220**2,thetas))
 plt.axhline(0, color='red')
-plt.axhline(1, color='red')
+plt.axhline(g(220**2, np.pi/2), color='red')
 plt.show()
 ```
 
@@ -535,38 +536,111 @@ It returns $N$ events with the following variables:
 * $\phi$: polar angle in the CM frame.
 
 ```{python}
-k = 1.0
-def event_generator(N, r=1, E=52.9, sigma=0.5): #to be vectorized
-    ys, zs, Es = generate(N,r,E,sigma)
-    ths = np.zeros(N)
-    sqs = np.sqrt(Es/(2*me*1e-3))
-    phs = np.random.uniform(0,2*np.pi, size=N)
+def generate_nonmonochromatic(s, batch_size=10000):
+    """Generates N = len(s) events for a non-monochromatic beam with s near the threshold.
+    Uses rejection method for sampling theta*.
     
-    i = 0
-    while i<N:
-        u = np.random.uniform(0, np.pi)
-        v = np.random.uniform(0, k)
-        if v <= g(sqs[i]**2,u)*np.sin(u):
-            ths[i] = u
-            i += 1
-            continue
+    Parameters
+    ----------
+    s : ndarray (N,)
+       Center of mass energies squared for each event [MeV^2]
+    batch_size : int, optional
+       Internal batch size used to improve performance
     
-    return ys, zs, Es, sqs, ths, phs
+    Returns
+    -------
+    statistics : ndarray of size (N, 6)
+       Each row is one event, and contains the components of the 3-momenta (in the laboratory frame)
+       of the muon-antimuon pair, in [MeV/c]
+    """
+    
+    assert np.all(s > 4 * mmu**2), "Some energies are under the threshold for muon production"
+    
+    N = len(s)
+    ths = np.zeros(N)                            #theta*
+    phs = np.random.uniform(0, 2*np.pi, size=N)  #phi*
+    
+    #generate theta* according to g(s, theta*)
+    generated = 0
+    g_max = np.max(g(s, np.pi/2)) #for s sufficiently small, the maximum of g is at theta* = pi/2
+    
+    buffer_s = np.copy(s[:batch_size])
+    if (len(buffer_s) < batch_size):
+        buffer_s = np.pad(buffer_s, (0, batch_size - len(buffer_s)), 'constant', constant_values=np.nan)
+    
+    while generated < N:
+        #print(generated)
+        #print("prima", buffer_s)
+        u  = np.random.uniform(0, np.pi, size=batch_size)
+        gu = g(buffer_s, u)
+        v  = np.random.uniform(0, g_max, size=batch_size)
+        
+        selected = v <= gu
+        n_selected = np.sum(selected)
+        
+        ths[generated:min(generated+n_selected, N+1)] = u[selected][:min(n_selected, N-generated)]
+        
+        #replaces already used values of s with new ones
+        new_buffer = s[batch_size+generated:min(batch_size+generated+n_selected,N)]
+        #print("new_buffer", new_buffer)
+        #print("selected", selected)
+        
+        buffer_s[selected] = np.pad(new_buffer, (0, n_selected-len(new_buffer)), 'constant', constant_values=np.nan)
+        #print("Dopo", buffer_s)
+        
+        generated += n_selected
+    #Boost to laboratory frame
+    pnorm = p_mu_cm(s)
+    px_cm, py_cm, pz_cm = to_cartesian(pnorm, ths, phs)
+    
+    _, px1 = energy_x_boost(s, px_cm)  #px for first muon
+    _, px2 = energy_x_boost(s, -px_cm) #px for second muon
+    
+    return np.stack((px1, py_cm, pz_cm, px2, -py_cm, -pz_cm), axis=1)
+```
+
+**Implementation details** Vectorized code runs faster, and it is usually easier to parallelize (e.g. on a GPU). So the main target is to *avoid entirely* python loops, or - if this is not possible - make them shorter. In the function above, we start by dividing data in *batches*, i.e. smaller parts that are easier to process without encurring in data transfer bottlenecks. Then, for each batch:
+
+1. We generate $n$ candidates for the $\theta^*$, i.e. random numbers in $[0,\pi]$, where $n$ is the batch size.
+   Then we evaluate $g(s,\theta^*)$ over all of these $\theta^*$, using as $\mathbf{s}$ the values stored in a buffer, which is initialized with the first $n$ values of the argument $\mathbf{s}$. Each candidate is accepted if another random variable $v$, picked uniformly in $[0, \max g]$ is lower than $g(s,\theta^*)$. This comparison is also vectorized.
+2. Now, statistically, there will be some rejected samples, meaning that some items of $\mathbf{s}$ need to be reused in the next batch. So, all values of $s_i$ that have already resulted in accepted samples are replaced with new ones. If there aren't enough new $s_i$ to fill the "gaps" in the buffer, we use `np.nan` instead. In fact, according to the floating point specification, any computation (such as sums, multiplications, etc.) done with NaN will return NaN. So $g({\rm NaN},\theta^*)$ will be always NaN, and every comparison (for example the <= we use) will return False, meaning that introducing NaNs can't produce new selected $\theta^*$.
+3. After having "refilled" the $s$ buffer, we can reiterate the cycle. Note that at every operation an entire batch is processed at once. Only at the execution end there is some loss of perfomance due to the presence of missing values.
+
+
+
+
+In the laboratory frame, the electron is stationary, while the positron is directed along $\hat{x}$:
+$$p_{e^-} = (m_e, 0, 0, 0); \qquad p_{e^+} = (\mathcal{E}_+, \sqrt{\mathcal{E}_+^2 - m_e^2}, 0, 0)$$
+So $s$ is:
+$$ s = (p_{e^-} + p_{e^+})^2 = m_e^2 + \mathcal{E}_+^2 + 2 m_e \mathcal{E}_+ - \mathcal{E}_+^2 + m_e^2 = 2m_e(\mathcal{E}_+ + m_e) \Rightarrow \mathcal{E}_+ = \frac{s}{2 m_e} - m_e$$
+
+```{python}
+212**2/(2 * me)
 ```
 
 ```{python}
-ys_cm, zs_cm, Es_cm, sqs_cm, ths_cm, phs_cm = event_generator(1000000, E=52.9, sigma=0.5)
+num_samples = int(1e3)
+
+#Let's fix the center sqrt(s) at 230MeV. The E+ has a width of 0.5 GeV, that corresponds to a width of s equal to:
+sigma_mu = 0.1 * 1e3 #0.5 GeV 
+sigma_s  = 2 * me * (sigma_mu + me) 
+
+s_vec = np.random.normal(213**2, sigma_s, size=num_samples)
+
+momenta = generate_nonmonochromatic(s_vec)
 ```
 
 ```{python}
-x = np.arange(0,np.pi,0.001)
-plt.hist(ths_cm, bins=100, density=True)
-plt.plot(x, dsigma_norm_dist(230**2,x))
+plt.hist(momenta[:,3], bins=100)
 plt.show()
 ```
 
 ```{python}
-#Add boost and plots
+
+decay_point = np.random.uniform(0, 1, size=num_samples)
+deltay = momenta[:,1] / momenta[:,0] * decay_point + np.random.uniform(0,1, size=num_samples)
+
+plt.scatter(deltay , momenta[:,1]/momenta[:,0], s = .5)
 ```
 
 # 5. Tracking detector statistics <a class="anchor" id="Report.5"></a>
@@ -575,6 +649,76 @@ plt.show()
 ```{python}
 #Add pictures
 #Test if it works
+```
+
+```{python}
+pnorms_sq = np.sum(np.square(momenta[:,:3]), axis=1)
+```
+
+```{python}
+gamma_mus = np.sqrt(pnorms_sq + mmu**2) / mmu
+```
+
+$$ v = \frac{pc}{m \gamma} $$
+
+
+$$ \gamma_\mu = \frac{1}{\sqrt{1-\beta_\mu^2}} = \frac{\sqrt{p_\mu^2 + m_\mu^2}}{m_\mu} \qquad \beta_\mu = \frac{p_\mu}{\mathcal{E}_\mu} = \frac{p_\mu}{\sqrt{m_\mu^2 + p_\mu^2}} \qquad p_\mu^2 = ||{\vec{p}_\mu}||^2 $$
+
+```{python}
+velocities = momenta[:,:3] * 3e8 / (mmu * gamma_mus[..., np.newaxis])
+
+v_norms = np.sqrt(np.sum(np.square(velocities), axis=1))
+```
+
+```{python}
+q = 1.60217e-19 #Electron charge          [C]
+B = 1.7     #Magnetic field intensity [T]
+muon_mass = 1.883e-28 #Muon mass [kg]
+omegas = q * B / (muon_mass * gamma_mus)
+```
+
+```{python}
+radii = np.sqrt( np.square(velocities[:,0]/omegas) + np.square(velocities[:,1]/omegas) )
+```
+
+```{python}
+y0, z0 = generate_yz(num_samples, 1) #y0, z0 in [cm]
+y0 /= 100 #to [m]
+z0 /= 100
+```
+
+```{python}
+vx = velocities[:,0]
+vy = velocities[:,1]
+vz = velocities[:,2]
+```
+
+```{python}
+l_magnet = 2 #magnet length in [m]
+
+yf = ( np.sqrt( np.square(radii * omegas) - np.square(omegas * l_magnet) + 2 * l_magnet * vy * omegas
+                            - np.square(vy) ) - vx ) / omegas
+```
+
+```{python}
+d_square = l_magnet**2 + np.square(y0 - yf)
+costhetas = 1 - d_square / (2 * np.square(radii))
+
+tf = radii * np.arccos(costhetas) / v_norms 
+```
+
+```{python}
+zf = vz * tf + z0
+```
+
+```{python}
+#Plot immediately after the magnet
+plt.xlabel(r"$\Delta y$ [cm]")
+plt.ylabel(r"$\Delta z$ [cm]")
+plt.scatter(y0*100, z0*100, s=.9, c='red', label="Before magnet")
+plt.scatter((yf-np.mean(yf)) * 100, (zf-np.mean(zf)) * 100, s=.9, label="After magnet", c='b') #in [cm]
+plt.legend()
+plt.plot()
 ```
 
 Let's compute the variation in the the trajectory induced by the presence of a magnet, each particle is identified by it's position at the end of the berillium block and it's tri-momentum at the exit.
@@ -602,7 +746,7 @@ $$
 \omega =\frac{qB}{m\gamma} \qquad \alpha=-arctan \frac{v_{0y}}{v_{0x}}=-arctan \frac{p_{0y}}{p_{0x}}
 $$
 
-Since the realtion between momentum and velocity is $p_i=\gamma mv_i$  we have
+Since the relation between momentum and velocity is $p_i=\gamma mv_i$  we have
 $$
 v_{pe}=\sqrt{v_{0x}^2+v_{0y}^2} \implies \frac{|v_{pe}|}{\omega}=\frac{\sqrt{p_{0x}^2+p_{0y}^2}}{qB}
 $$
@@ -615,42 +759,78 @@ $$
 
 After the magnet the EOM is the one of a free particle.
 
+
+**Edit** Last equation should be:
+$$\omega t = \alpha + \arcsin \left( \frac{\omega( x(\hat{t}) - x_0 )}{|v_{\rm pe}|} \right) $$
+This works if $x(\hat{t})$ is reachable (this is indeed the case).
+Also one needs to subtract the center coordinates from $x(t)$ and $y(t)$ (in the solution, I think, the origin is set as the center)
+
 ```{python}
 #let's put the values
 import scipy as sp
 import math
 import numpy as np
-q=1.602176634e-19 #C
-B=1.7 #T
-c=3e8 #m/s
-mmu=105.6583755
-qB=q*B #devo moltiplicare per c?
 
+q   = 1.602176634e-19 #Elementary charge [C]
+B   = 1.7 #Magnetic field intensity [B]
+c   = 3e8 #Speed of light [m/s]
+mmu = 105.6583755 #Muon mass [MeV/c]
+
+qB  = q*B 
 ```
 
 ```{python}
-#this function requires 2 array one with the 3 position component and one with the momentum ones and how many meters the field is long
-#and return the final position and momentum
-def bend_particle (position, momentum, meters):
-    p=np.linalg.norm(momentum) #modulo del momento
-    beta= p/math.sqrt(p**2+mmu**2)
-    gamma=1/math.sqrt(1-beta**2)
-    alpha=-math.arctan(momentum[1]/momentum[0]) #fase nel sen e coseno
-    v_w = math.sqrt(momentum[0]**2+momentum[1]**2)*(10**6)/qB #rapporto v perperdicolare su omega, il 10^6 è perche il momento è in Mev
-    wt=alpha+math.arcsin(meters-w_w) #omega per tempo
-    final_momentum=[] #arrays for final results
-    final_position=[]
-    final_position.append(position[0]+meters) #final x position
-    final_position.append(position[1]+v_w*math.cos(wt-alpha)) #final y position
-    final_position.append(position[2]+momentum[2]*wt/qB) #final z position rewritten in terms of stuff i know
-    final_momentum.append(math.sqrt(momentum[0]**2+momentum[1]**2)*math.cos(wt-alpha)) #final x momentum
-    final_momentum.append(math.sqrt(momentum[1]**2+momentum[1]**2)*math.sin(wt-alpha)) #final y momentum
-    final_momentum.append(momentum[2]) #final z momentum
+#Fixed the c
+def bend_particle (position, momentum, meters): #to be vectorized
+    """Computes the final position and momentum of a particle starting at @position, with @momentum, subject to a constant magnetic field
+    along z, and stopping after @meters in the x direction.
+       
+    Parameters
+    ----------
+    position : ndarray, (3,)
+       Starting coordinates for the particle [m]
+    momentum : ndarray, (3,)
+       Starting momentum for the particle [MeV/c]
+    meters : float
+       The particle stops after travelling @meters in the x direction
+    
+    Returns
+    -------
+    final_pos, final_p : Tuples of ndarray, each of dimension (3,)
+       final_pos = Final coordinates for the particle
+       final_p   = Final particle momentum
+    """
+    
+    p     = np.linalg.norm(momentum) 
+    beta  = p / np.sqrt(p**2 + mmu**2)
+    gamma = 1 / math.sqrt(1 - beta**2)
+    omega = (B * c**2) / (mmu * 1e6 * gamma)
+    
+    #print(p, beta, gamma)
+    
+    alpha = -math.atan(momentum[1] / momentum[0]) #fase nel sen e coseno
+    #print(alpha)
+    v_w   = np.sqrt(momentum[0]**2 + momentum[1]**2) * (1e6) / (B * c) #rapporto v perperdicolare su omega, il 10^6 è perche il momento è in Mev
+    #EDIT: v_w = |vpe|/w deve essere in [m] La radice dei momenti è in MeV/c, per cui non serve dividere per q (dato che siamo in eV), e bisogna aggiungere una c al denominatore  
+    #Full conto: MeV/c / (C * T) = e/c * 1e6 [m], dove e è la carica dell'elettrone, e c la velocità della luce. 
+    #print(v_w)
+    
+    wt = alpha + np.arcsin((meters - position[0]) / v_w) #omega per tempo (EDITED)
+    #print(wt)
+    
+    final_position = np.array([v_w * np.sin(wt - alpha), v_w * np.cos(wt - alpha), momentum[2] * wt * 1e6 / (B * c)])
+    final_position += np.array(position) #sum initial position
+    final_position += np.array([momentum[1] * 1e6 / (B * c), -momentum[0] * 1e6 / (B * c), 0]) #Add center coordinates
+    
+    p_pe = np.sqrt(momentum[0]**2 + momentum[1]**2)
+    final_momentum = np.array([p_pe * np.cos(wt - alpha), p_pe * np.sin(wt - alpha), momentum[2]])
+    
     return final_position, final_momentum
+
 
 #this function requires 2 array one with the 3 position component and one with the momentum ones and how many meters it travels
 #and returns final poswition and momentum
-def free_particle(position, momentum, meters):
+def free_particle(position, momentum, meters):  #to be reviewed + vectorized
     p=np.linalg.norm(momentum) #modulo del momento
     beta= p/math.sqrt(p**2+mmu**2)
     gamma=1/math.sqrt(1-beta**2)
@@ -659,6 +839,38 @@ def free_particle(position, momentum, meters):
     final_position.append(position[0]+meters) #final x position
     final_position.append(position[1]+momentum[1]*time/(mmu*gamma)) #final y position
     final_position.append(position[2]+momentum[2]*time/(mmu*gamma)) #final z position
+```
+
+```{python}
+y, z = generate_yz(num_samples, 1)
+x = np.zeros(num_samples)
+
+positions = np.stack((x, y, z), axis=1)
+
+bend_particle(positions[0] / 100, momenta[0,:3], 2)
+```
+
+```{python}
+#Bend 1000 particles
+
+f_y = []
+f_z = []
+for i in range(1000):
+    f_pos, f_mom = bend_particle(positions[i] / 100, momenta[i, :3], 2)
+    f_y.append(f_pos[1])
+    f_z.append(f_pos[2])
+```
+
+```{python}
+#Plot immediately after the magnet
+plt.xlabel(r"$\Delta y$ [cm]")
+plt.ylabel(r"$\Delta z$ [cm]")
+plt.scatter(positions[:,1], positions[:,2], s=.9, c='red', label="Before magnet")
+plt.scatter((f_y-np.mean(f_y))*100, (f_z-np.mean(f_z))*100, s=.9, label="After magnet", c='b') #in [cm]
+plt.legend()
+plt.plot()
+
+#quite different from the other one. Why?
 ```
 
 # Citations
