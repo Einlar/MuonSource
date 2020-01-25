@@ -476,6 +476,8 @@ plt.show()
 ```
 
 ```{python}
+Es = np.random.normal(52.9, 0.5, size=1000000) #GeV
+
 plt.figure(figsize=(6,6))
 plt.hist2d(ys, zs, bins=100, weights=Es)
 plt.xlabel('y')
@@ -615,10 +617,6 @@ So $s$ is:
 $$ s = (p_{e^-} + p_{e^+})^2 = m_e^2 + \mathcal{E}_+^2 + 2 m_e \mathcal{E}_+ - \mathcal{E}_+^2 + m_e^2 = 2m_e(\mathcal{E}_+ + m_e) \Rightarrow \mathcal{E}_+ = \frac{s}{2 m_e} - m_e$$
 
 ```{python}
-212**2/(2 * me)
-```
-
-```{python}
 num_samples = int(1e5)
 
 #Let's fix the center sqrt(s) at 230MeV. The E+ has a width of 0.5 GeV, that corresponds to a width of s equal to:
@@ -636,11 +634,10 @@ plt.show()
 ```
 
 ```{python}
-
 decay_point = np.random.uniform(0, 1, size=num_samples)
 deltay = momenta[:,1] / momenta[:,0] * decay_point + np.random.uniform(0,1, size=num_samples)
 
-plt.scatter(deltay , momenta[:,1]/momenta[:,0], s = .5)
+plt.scatter(deltay , momenta[:,1]/momenta[:,0], s = .5) #plot y y'
 ```
 
 # 5. Tracking detector statistics <a class="anchor" id="Report.5"></a>
@@ -651,121 +648,39 @@ plt.scatter(deltay , momenta[:,1]/momenta[:,0], s = .5)
 #Test if it works
 ```
 
-```{python}
-pnorms_sq = np.sum(np.square(momenta[:,:3]), axis=1)
-```
-
-```{python}
-gamma_mus = np.sqrt(pnorms_sq + mmu**2) / mmu
-```
-
-$$ v = \frac{pc}{m \gamma} $$
-
-
-$$ \gamma_\mu = \frac{1}{\sqrt{1-\beta_\mu^2}} = \frac{\sqrt{p_\mu^2 + m_\mu^2}}{m_\mu} \qquad \beta_\mu = \frac{p_\mu}{\mathcal{E}_\mu} = \frac{p_\mu}{\sqrt{m_\mu^2 + p_\mu^2}} \qquad p_\mu^2 = ||{\vec{p}_\mu}||^2 $$
-
-```{python}
-velocities = momenta[:,:3] * 3e8 / (mmu * gamma_mus[..., np.newaxis])
-
-v_norms = np.sqrt(np.sum(np.square(velocities), axis=1))
-```
-
-```{python}
-q = 1.60217e-19 #Electron charge          [C]
-B = 1.7     #Magnetic field intensity [T]
-muon_mass = 1.883e-28 #Muon mass [kg]
-omegas = q * B / (muon_mass * gamma_mus)
-```
-
-```{python}
-radii = np.sqrt( np.square(velocities[:,0]/omegas) + np.square(velocities[:,1]/omegas) )
-```
-
-```{python}
-y0, z0 = generate_yz(num_samples, 1) #y0, z0 in [cm]
-y0 /= 100 #to [m]
-z0 /= 100
-```
-
-```{python}
-vx = velocities[:,0]
-vy = velocities[:,1]
-vz = velocities[:,2]
-```
-
-```{python}
-l_magnet = 2 #magnet length in [m]
-
-#yf = ( np.sqrt( np.square(radii * omegas) - np.square(omegas * l_magnet) + 2 * l_magnet * vy * omegas
-#                            - np.square(vy) ) - vx ) / omegas
-
-yf=np.sqrt(np.square(radii)- np.square(vy/omegas-l_magnet)) -vx/omegas+y0
-```
-
-```{python}
-d_square = l_magnet**2 + np.square(y0 - yf)
-costhetas = 1 - d_square / (2 * np.square(radii))
-
-tf = radii * np.arccos(costhetas) / v_norms 
-```
-
-```{python}
-zf = vz * tf + z0
-```
-
-```{python}
-#Plot immediately after the magnet
-plt.xlabel(r"$\Delta y$ [cm]")
-plt.ylabel(r"$\Delta z$ [cm]")
-plt.scatter(y0*100, z0*100, s=.9, c='red', label="Before magnet")
-plt.scatter((yf-np.mean(yf)) * 100, (zf-np.mean(zf)) * 100, s=.9, label="After magnet", c='b') #in [cm]
-plt.legend()
-plt.plot()
-```
-
 Let's compute the variation in the the trajectory induced by the presence of a magnet, each particle is identified by it's position at the end of the berillium block and it's tri-momentum at the exit.
 
-We know that the relativistic motion in an uniform magnetic field along the z-axis has the following EOM:
+Consider a particle with initial position $\mathbf{x}_0 = (x_0, y_0, z_0)^T$ and velocity $\mathbf{v}_0 = (v_{0x}, v_{0y}, v_{0z})^T$ in the laboratory frame, moving inside a magnetic field $\mathbf{B} = (0,0,B)^T$. The solution of the equation of motion is given by:
 $$ 
     \begin{cases}
-    x(t)= x_0 + \frac{|v_{pe}|}{\omega}\sin (\omega t -\alpha)\\
-    y(t)= y_0 + \frac{|v_{pe}|}{\omega}\cos (\omega t -\alpha)\\
+    x(t)= x_0 + \frac{v_{0y}}{\omega} + \dfrac{v_{\perp}}{\omega}\sin (\omega t -\alpha)\\
+    y(t)= y_0 - \frac{v_{0x}}{\omega} + \dfrac{v_{\perp}}{\omega}\cos (\omega t -\alpha)\\
     z(t)= z_0 + v_{0z}t
     \end{cases} 
-$$
-and the tri-momentum are
-$$
+    \qquad 
     \begin{cases}
-    p_x(t)= \sqrt{p_{0x}^2+p_{0y}^2}\cos (\omega t -\alpha)\\
-    p_y(t)= \sqrt{p_{0x}^2+p_{0y}^2}\sin (\omega t -\alpha)\\
+    p_x(t)= p_\perp \cos (\omega t -\alpha)\\
+    p_y(t)= p_\perp \sin (\omega t -\alpha)\\
     p_z(t)= p_{z0}
     \end{cases} 
 $$
-
-Where
-
+With:
 $$
-\omega =\frac{qB}{m\gamma} \qquad \alpha=-arctan \frac{v_{0y}}{v_{0x}}=-arctan \frac{p_{0y}}{p_{0x}}
+\omega =\frac{qB}{m\gamma}; \qquad \alpha=\arctan\left(\frac{v_{0y}}{v_{0x}}\right)=\arctan \left(\frac{p_{0y}}{p_{0x}}\right); \quad v_\perp=\sqrt{v_{0x}^2+v_{0y}^2}; \quad p_\perp = \sqrt{p_{0x}^2 + p_{0y}^2}
 $$
-
-Since the relation between momentum and velocity is $p_i=\gamma mv_i$  we have
+As the relation between momentum and velocity is given by:
 $$
-v_{pe}=\sqrt{v_{0x}^2+v_{0y}^2} \implies \frac{|v_{pe}|}{\omega}=\frac{\sqrt{p_{0x}^2+p_{0y}^2}}{qB}
+\mathbf{p}c = m \gamma \mathbf{v}
 $$
-
-Since we know where the position along the x axis where the magnet ends is we can compute the time travel inverting the first equation and then substitute to have the final position of the particle
-
+we have:
 $$
-\omega t=\alpha + arcsen( x(\hat{t})- \frac{|v_{pe}|}{\omega})
+ \frac{v_\perp}{\omega}=\frac{c\sqrt{p_{0x}^2+p_{0y}^2}}{qB}
 $$
-
+The particle exits the magnetic field after travelling a fixed distance $x(\hat{t})$ over the $\hat{x}$ axis, leading to:
+$$
+\omega \hat{t}=\alpha + \arcsin \left(\left[x(\hat{t}) - x_0 - \frac{v_{0y}}{\omega} \right] \frac{\omega}{v_\perp} \right)
+$$
 After the magnet the EOM is the one of a free particle.
-
-
-**Edit** Last equation should be:
-$$\omega t = \alpha + \arcsin \left( \frac{\omega( x(\hat{t}) - x_0 )}{|v_{\rm pe}|} \right) $$
-This works if $x(\hat{t})$ is reachable (this is indeed the case).
-Also one needs to subtract the center coordinates from $x(t)$ and $y(t)$ (in the solution, I think, the origin is set as the center)
 
 ```{python}
 #let's put the values
@@ -783,158 +698,173 @@ qB  = q*B
 
 ```{python}
 #Fixed the c
-def bend_particle (position, momentum, meters): #to be vectorized
-    """Computes the final position and momentum of a particle starting at @position, with @momentum, subject to a constant magnetic field
+def bend_particle (positions, momenta, meters): 
+    """Computes the final position and momentum of N particles starting at @position, with @momentum, subject to a constant magnetic field
     along z, and stopping after @meters in the x direction.
        
     Parameters
     ----------
-    position : ndarray, (3,)
+    positions : ndarray, (N, 3)
        Starting coordinates for the particle [m]
-    momentum : ndarray, (3,)
+    momenta : ndarray, (N, 3,)
        Starting momentum for the particle [MeV/c]
     meters : float
        The particle stops after travelling @meters in the x direction
     
     Returns
     -------
-    final_pos, final_p : Tuples of ndarray, each of dimension (3,)
-       final_pos = Final coordinates for the particle
-       final_p   = Final particle momentum
+    final_pos, final_p : Tuples of ndarray, each of dimension (N, 3)
+       final_pos = Final coordinates for the particles [m]
+       final_p   = Final particles momentum [Mev/c]
     """
     
-    p     = np.linalg.norm(momentum) 
-    beta  = p / np.sqrt(p**2 + mmu**2)
-    gamma = 1 / math.sqrt(1 - beta**2)
-    omega = (B * c**2) / (mmu * 1e6 * gamma)
+    assert len(positions) == len(momenta), "Positions and momenta must be of the same length"
+    assert len(positions.shape) == len(momenta.shape) == 2, "Positions and momenta must be matrices"
     
-    #print(p, beta, gamma)
+    p_norm_sq = np.sum(np.square(momenta), axis=1) #|p|^2 in [Mev^2/c^2]
     
-    alpha = -math.atan(momentum[1] / momentum[0]) #fase nel sen e coseno
-    #print(alpha)
-    v_w   = np.sqrt(momentum[0]**2 + momentum[1]**2) * (1e6) / (B * c) #rapporto v perperdicolare su omega, il 10^6 è perche il momento è in Mev
+    cc = 2.99792458e2 #to reduce numerical errors (=c/1e6)
+    
+    gamma = np.sqrt(p_norm_sq / (mmu**2) + 1)
+    omega = (B * c) / (mmu * cc * gamma)
+    
+    alpha = np.arctan(momenta[:,1] / momenta[:,0]) 
+    
+    
+    p_pe  = np.sqrt(np.sum(np.square(momenta[:,:2]), axis=1))
+    v_w   = p_pe / (B * cc) #rapporto v perperdicolare su omega, il 10^6 è perche il momento è in Mev
     #EDIT: v_w = |vpe|/w deve essere in [m] La radice dei momenti è in MeV/c, per cui non serve dividere per q (dato che siamo in eV), e bisogna aggiungere una c al denominatore  
     #Full conto: MeV/c / (C * T) = e/c * 1e6 [m], dove e è la carica dell'elettrone, e c la velocità della luce. 
-    #print(v_w)
     
-    wt = alpha + np.arcsin((meters - position[0]) / v_w) #omega per tempo (EDITED)
-    #print(wt)
+    wt = alpha + np.arcsin((meters - positions[:,0] - momenta[:,1] / (B * cc)) / v_w) #omega per tempo (EDITED)
     
-    final_position = np.array([v_w * np.sin(wt - alpha), v_w * np.cos(wt - alpha), momentum[2] * wt * 1e6 / (B * c)])
-    final_position += np.array(position) #sum initial position
-    final_position += np.array([momentum[1] * 1e6 / (B * c), -momentum[0] * 1e6 / (B * c), 0]) #Add center coordinates
+    final_position = np.stack(( v_w * np.sin(wt - alpha) + momenta[:,1] / (B * cc),
+                                v_w * np.cos(wt - alpha) - momenta[:,0] / (B * cc), 
+                                momenta[:,2] * wt / (B * cc)
+                               ), axis=1)    
+    final_position += positions #sum initial position
     
-    p_pe = np.sqrt(momentum[0]**2 + momentum[1]**2)
-    final_momentum = np.array([p_pe * np.cos(wt - alpha), p_pe * np.sin(wt - alpha), momentum[2]])
+    final_momentum = np.stack((p_pe * np.cos(wt - alpha), p_pe * np.sin(wt - alpha), momenta[:,2]), axis=1)
     
     return final_position, final_momentum
 
 
-#this function requires 2 array one with the 3 position component and one with the momentum ones and how many meters it travels
-#and returns final poswition and momentum
-def free_particle(position, momentum, meters):  #to be reviewed + vectorized
-    p     = np.linalg.norm(momentum) 
-    beta  = p / np.sqrt(p**2 + mmu**2)
-    gamma = 1 / math.sqrt(1 - beta**2)
-    velox= momentum*1e8/(mmu*gamma)
-    final_position=[]
-    time=meters/velox[0] #time travel on the x axis
-    final_position.append(position[0]+meters) #final x position
-    final_position.append(position[1]+velox[1]*time) #final y position
-    final_position.append(position[2]+velox[2]*time) #final z position
-    return final_position, momentum
+def free_particle(positions, momenta, meters):
+    """Computes the final positions of N particles, given their initial @positions and @momenta, after having travelled @meters
+    in the x direction (uniform motion)
+    
+    Parameters
+    ----------
+    positions : ndarray of size (N,3)
+       Particles initial positions [m]
+    momenta : ndarray of size (N,3)
+       Particles initial momenta [MeV/c]
+    meters : 
+       Motion stops after having travelled this distance [m] over the x axis
+    
+    Returns
+    -------
+    final_position : ndarray of size (N,3)
+       Final positions for the particles [m]
+    """
+    
+    p_norm_sq = np.sum(np.square(momenta), axis=1) #|p|^2 in [Mev^2/c^2]
+    gamma = np.sqrt(p_norm_sq + mmu**2) / mmu
+    
+    velox = momenta * c / (mmu * gamma[..., np.newaxis])
+    arrival_times = meters / velox[:,0] #time travel on the x axis
+    
+    final_position = np.stack(( np.full(len(positions), fill_value = meters),
+                                velox[:, 1] * arrival_times,
+                                velox[:, 2] * arrival_times
+                              ), axis=1)
+    final_position += positions
+    
+    return final_position
+```
+
+**Simulation**
+
+```{python}
+#Magnet deflection
+num_samples = int(1e6)
+
+s_vec = np.random.normal(213**2, sigma_s, size=num_samples) #Generate energies
+momenta = generate_nonmonochromatic(s_vec) #Generate non-monochromatic events
+
+y, z = generate_yz(num_samples, 1) 
+#Not all particles scatter at the same position in the target. However, as the beryllium block is only 6cm thick, and thetamax
+#in the scattering is <.01 rad, the additional transversal deviation gained is negligible (a few micron, compared to a beam width
+#of 2cm)
+x = np.zeros(num_samples) #All particles enter B at the same position. (0,0,0) is the center of the beam at the target exit.
+#x is the longitudinal beam direction, while y and z are the trasversal ones
+
+
+positions = np.stack((x, y, z), axis=1) / 100 #[cm]
+f_pos, f_mom = bend_particle(positions, momenta, 2)
+
+plt.hist2d(f_pos[:,1] * 100, f_pos[:,2] * 100, bins=50)
+plt.show()
 ```
 
 ```{python}
-y, z = generate_yz(num_samples, 1)
-x = np.zeros(num_samples)
+#Linear propagation after the magnet
+ff_pos = free_particle(f_pos, f_mom, 6)
 
-positions = np.stack((x, y, z), axis=1)
-
-bend_particle(positions[0] / 100, momenta[0,:3], 2)
-```
-
-```{python}
-#Bend 1000 particles
-f_x = []
-f_y = []
-f_z = []
-f_px = []
-f_py = []
-f_pz = []
-for i in range(num_samples):
-    f_pos, f_mom = bend_particle(positions[i] / 100, momenta[i, :3], 2)
-    f_x.append(f_pos[0])
-    f_y.append(f_pos[1])
-    f_z.append(f_pos[2])
-    f_px.append(f_mom[0])
-    f_py.append(f_mom[1])
-    f_pz.append(f_mom[2])
-```
-
-```{python}
-#Plot immediately after the magnet
-plt.xlabel(r"$\Delta y$ [cm]")
-plt.ylabel(r"$\Delta z$ [cm]")
-plt.scatter(positions[:,1], positions[:,2], s=.9, c='red', label="Before magnet")
-plt.scatter((f_y-np.mean(f_y))*100, (f_z-np.mean(f_z))*100, s=.9, label="After magnet", c='b') #in [cm]
-plt.legend()
-plt.plot()
-
-#quite different from the other one. Why?
-```
-
-```{python}
-bended_positions = np.stack((f_x, f_y, f_z), axis=1)
-bended_momenta = np.stack((f_px, f_py, f_pz), axis=1)
-
-
-b_y = []
-b_z = []
-for i in range(num_samples):
-    f_pos, f_mom = free_particle(bended_positions[i], bended_momenta[i], 4)
-    b_y.append(f_pos[1])
-    b_z.append(f_pos[2])
-
-
-#Plot after 4 meter of free propagation after magnet
-plt.xlabel(r"$\Delta y$ [cm]")
-plt.ylabel(r"$\Delta z$ [cm]")
-plt.scatter((f_y-np.mean(f_y))*100, (f_z-np.mean(f_z))*100, s=.9, label="After magnet", c='b') #in [cm]
-plt.scatter((b_y-np.mean(b_y))*100, (b_z-np.mean(b_z))*100, s=.9, label="After propagation", c='g') #in [cm]
-plt.legend()
-plt.plot()
-
-```
-
-```{python}
-plt.figure(figsize=(6,6))
-plt.hist2d(positions[:,1], positions[:,2],bins=100)
-plt.xlabel('y')
-plt.ylabel('z')
+plt.hist2d(ff_pos[:,1] * 100, ff_pos[:,2] * 100, bins=50)
 plt.show()
 
-plt.figure(figsize=(6,6))
-plt.hist2d((f_y-np.mean(f_y))*100, (f_z-np.mean(f_z))*100,bins=100)
-plt.xlabel('y')
-plt.ylabel('z')
-plt.show()
-
-plt.figure(figsize=(6,6))
-plt.hist2d((b_y-np.mean(b_y))*100, (b_z-np.mean(f_z))*100,bins=100)
-plt.xlabel('y')
-plt.ylabel('z')
-plt.show()
-
+#I think that we should put the screen perpendicular to the beam
 ```
 
 # Citations
 - [1]: Electron-positron annihilation into muon-antimuon pairs, full calculation, [link](http://www.physics.usu.edu/Wheeler/QFT/PicsII/QFT10Feb23Muon.pdf)
 
 ```{python}
+q = 1.60217e-19 #Electron charge          [C]
+B = 1.7     #Magnetic field intensity     [T]
+muon_mass = 1.883e-28 #Muon mass [kg]
+l_magnet = 2 #magnet length in [m]
 
+def magnetic_trajectory(yz, momenta):
+    y0 = yz[:,0]
+    z0 = yz[:,1]
+    pnorms_sq = np.sum(np.square(momenta[:,:3]), axis=1)
+    gamma_mus = np.sqrt(pnorms_sq / (mmu**2) + 1)
+    #np.sqrt(pnorms_sq + mmu**2) / mmu
+    
+    velocities = momenta[:,:3] * 3e8 / (mmu * gamma_mus[..., np.newaxis])
+    
+    vx = velocities[:,0]
+    vy = velocities[:,1]
+    vz = velocities[:,2]
+
+    v_norms = np.sqrt(np.sum(np.square(velocities), axis=1))
+    omegas = q * B / (muon_mass * gamma_mus)
+
+    radii = np.sqrt( np.square(velocities[:,0]/omegas) + np.square(velocities[:,1]/omegas) )
+    yf = ( np.sqrt( np.square(radii * omegas) - np.square(omegas * l_magnet) + 2 * l_magnet * vy * omegas
+                            - np.square(vy) ) - vx ) / omegas + y0
+    d_square = l_magnet**2 + np.square(y0 - yf)
+    costhetas = 1 - d_square / (2 * np.square(radii))
+
+    tf = radii * np.arccos(costhetas) / v_norms 
+    zf = vz * tf + z0
+    
+    return yf, zf
 ```
 
-```{python}
+$$ v = \frac{pc}{m \gamma} $$
 
+
+$$ \gamma_\mu = \frac{1}{\sqrt{1-\beta_\mu^2}} = \frac{\sqrt{p_\mu^2 + m_\mu^2}}{m_\mu} \qquad \beta_\mu = \frac{p_\mu}{\mathcal{E}_\mu} = \frac{p_\mu}{\sqrt{m_\mu^2 + p_\mu^2}} \qquad p_\mu^2 = ||{\vec{p}_\mu}||^2 $$
+
+```{python}
+#Plot immediately after the magnet
+#plt.xlabel(r"$\Delta y$ [cm]")
+#plt.ylabel(r"$\Delta z$ [cm]")
+#plt.scatter(y0*100, z0*100, s=.9, c='red', label="Before magnet")
+#plt.scatter((yf-np.mean(yf)) * 100, (zf-np.mean(zf)) * 100, s=.9, label="After magnet", c='b') #in [cm]
+#plt.legend()
+#plt.plot()
 ```
