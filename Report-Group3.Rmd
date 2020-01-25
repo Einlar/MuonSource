@@ -248,31 +248,31 @@ sns.distplot(px_mu_lab)
 ## Esperimenti (plot a caso per verificare robe, saranno poi rimossi)
 
 ```{python}
-sns.jointplot(x=E_mu_lab1/1000, y=ths_cm_boosted*100, kind="hex", ylim=(0,0.5), 
-              xlim=(10,30), joint_kws=dict(gridsize=10), bins='log')
+#sns.jointplot(x=E_mu_lab1/1000, y=ths_cm_boosted*100, kind="hex", ylim=(0,0.5), 
+#              xlim=(10,30), joint_kws=dict(gridsize=10), bins='log')
 ```
 
 ```{python}
-from matplotlib.colors import LogNorm
+#from matplotlib.colors import LogNorm
 ```
 
 ```{python}
-plt.hist2d(E_mu_lab1/1000, ths_cm_boosted*100, norm=LogNorm(), bins=(150,150), range=[[0,30],[0,0.5]])
-plt.show() #viene un po' troppo "sottile"
+#plt.hist2d(E_mu_lab1/1000, ths_cm_boosted*100, norm=LogNorm(), bins=(150,150), range=[[0,30],[0,0.5]])
+#plt.show() #viene un po' troppo "sottile"
 ```
 
 ```{python}
-ss = np.linspace(211.5, 230, 100)
-plt.plot(ss,sigma(ss**2) * 389.4 * 1e6) #questo viene come nel paper
+#ss = np.linspace(211.5, 230, 100)
+#plt.plot(ss,sigma(ss**2) * 389.4 * 1e6) #questo viene come nel paper
 ```
 
 ```{python}
-def theta_max(s):
-    return 4 * me / s * np.sqrt(s/4 - mmu**2)
+#def theta_max(s):
+  #  return 4 * me / s * np.sqrt(s/4 - mmu**2)
 
-print(theta_max(s))
+#print(theta_max(s))
 
-print(np.max(ths_cm_boosted))
+#print(np.max(ths_cm_boosted))
 
 #vengono diverse, ma non di molto. L'approssimazione è migliore per sqrt(s) vicini alla soglia. Non dovrebbe essere un problema
 ```
@@ -619,7 +619,7 @@ $$ s = (p_{e^-} + p_{e^+})^2 = m_e^2 + \mathcal{E}_+^2 + 2 m_e \mathcal{E}_+ - \
 ```
 
 ```{python}
-num_samples = int(1e3)
+num_samples = int(1e5)
 
 #Let's fix the center sqrt(s) at 230MeV. The E+ has a width of 0.5 GeV, that corresponds to a width of s equal to:
 sigma_mu = 0.1 * 1e3 #0.5 GeV 
@@ -696,8 +696,10 @@ vz = velocities[:,2]
 ```{python}
 l_magnet = 2 #magnet length in [m]
 
-yf = ( np.sqrt( np.square(radii * omegas) - np.square(omegas * l_magnet) + 2 * l_magnet * vy * omegas
-                            - np.square(vy) ) - vx ) / omegas
+#yf = ( np.sqrt( np.square(radii * omegas) - np.square(omegas * l_magnet) + 2 * l_magnet * vy * omegas
+#                            - np.square(vy) ) - vx ) / omegas
+
+yf=np.sqrt(np.square(radii)- np.square(vy/omegas-l_magnet)) -vx/omegas+y0
 ```
 
 ```{python}
@@ -831,14 +833,16 @@ def bend_particle (position, momentum, meters): #to be vectorized
 #this function requires 2 array one with the 3 position component and one with the momentum ones and how many meters it travels
 #and returns final poswition and momentum
 def free_particle(position, momentum, meters):  #to be reviewed + vectorized
-    p=np.linalg.norm(momentum) #modulo del momento
-    beta= p/math.sqrt(p**2+mmu**2)
-    gamma=1/math.sqrt(1-beta**2)
+    p     = np.linalg.norm(momentum) 
+    beta  = p / np.sqrt(p**2 + mmu**2)
+    gamma = 1 / math.sqrt(1 - beta**2)
+    velox= momentum*1e8/(mmu*gamma)
     final_position=[]
-    time=mmu*gamma*meters/momentum[0] #time travel on the x axis
+    time=meters/velox[0] #time travel on the x axis
     final_position.append(position[0]+meters) #final x position
-    final_position.append(position[1]+momentum[1]*time/(mmu*gamma)) #final y position
-    final_position.append(position[2]+momentum[2]*time/(mmu*gamma)) #final z position
+    final_position.append(position[1]+velox[1]*time) #final y position
+    final_position.append(position[2]+velox[2]*time) #final z position
+    return final_position, momentum
 ```
 
 ```{python}
@@ -852,13 +856,20 @@ bend_particle(positions[0] / 100, momenta[0,:3], 2)
 
 ```{python}
 #Bend 1000 particles
-
+f_x = []
 f_y = []
 f_z = []
-for i in range(1000):
+f_px = []
+f_py = []
+f_pz = []
+for i in range(num_samples):
     f_pos, f_mom = bend_particle(positions[i] / 100, momenta[i, :3], 2)
+    f_x.append(f_pos[0])
     f_y.append(f_pos[1])
     f_z.append(f_pos[2])
+    f_px.append(f_mom[0])
+    f_py.append(f_mom[1])
+    f_pz.append(f_mom[2])
 ```
 
 ```{python}
@@ -873,8 +884,56 @@ plt.plot()
 #quite different from the other one. Why?
 ```
 
+```{python}
+bended_positions = np.stack((f_x, f_y, f_z), axis=1)
+bended_momenta = np.stack((f_px, f_py, f_pz), axis=1)
+
+
+b_y = []
+b_z = []
+for i in range(num_samples):
+    f_pos, f_mom = free_particle(bended_positions[i], bended_momenta[i], 4)
+    b_y.append(f_pos[1])
+    b_z.append(f_pos[2])
+
+
+#Plot after 4 meter of free propagation after magnet
+plt.xlabel(r"$\Delta y$ [cm]")
+plt.ylabel(r"$\Delta z$ [cm]")
+plt.scatter((f_y-np.mean(f_y))*100, (f_z-np.mean(f_z))*100, s=.9, label="After magnet", c='b') #in [cm]
+plt.scatter((b_y-np.mean(b_y))*100, (b_z-np.mean(b_z))*100, s=.9, label="After propagation", c='g') #in [cm]
+plt.legend()
+plt.plot()
+
+```
+
+```{python}
+plt.figure(figsize=(6,6))
+plt.hist2d(positions[:,1], positions[:,2],bins=100)
+plt.xlabel('y')
+plt.ylabel('z')
+plt.show()
+
+plt.figure(figsize=(6,6))
+plt.hist2d((f_y-np.mean(f_y))*100, (f_z-np.mean(f_z))*100,bins=100)
+plt.xlabel('y')
+plt.ylabel('z')
+plt.show()
+
+plt.figure(figsize=(6,6))
+plt.hist2d((b_y-np.mean(b_y))*100, (b_z-np.mean(f_z))*100,bins=100)
+plt.xlabel('y')
+plt.ylabel('z')
+plt.show()
+
+```
+
 # Citations
 - [1]: Electron-positron annihilation into muon-antimuon pairs, full calculation, [link](http://www.physics.usu.edu/Wheeler/QFT/PicsII/QFT10Feb23Muon.pdf)
+
+```{python}
+
+```
 
 ```{python}
 
