@@ -787,7 +787,7 @@ def free_particle(positions, momenta, meters):
 
 ```{python}
 #Magnet deflection
-num_samples = int(1e6)
+num_samples = int(1e5)
 
 s_vec = np.random.normal(213**2, sigma_s, size=num_samples) #Generate energies
 momenta = generate_nonmonochromatic(s_vec) #Generate non-monochromatic events
@@ -799,6 +799,8 @@ y, z = generate_yz(num_samples, 1)
 x = np.zeros(num_samples) #All particles enter B at the same position. (0,0,0) is the center of the beam at the target exit.
 #x is the longitudinal beam direction, while y and z are the trasversal ones
 
+positions = np.stack((x, y, z), axis=1) / 100 #[cm]
+f_pos, f_mom = bend_particle(positions, momenta, 2)
 
 positions = np.stack((x, y, z), axis=1) / 100 #[cm]
 f_pos, f_mom = bend_particle(positions, momenta, 2)
@@ -813,8 +815,6 @@ ff_pos = free_particle(f_pos, f_mom, 6)
 
 plt.hist2d(ff_pos[:,1] * 100, ff_pos[:,2] * 100, bins=50)
 plt.show()
-
-#I think that we should put the screen perpendicular to the beam
 ```
 
 # Citations
