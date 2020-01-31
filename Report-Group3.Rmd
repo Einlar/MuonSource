@@ -660,7 +660,7 @@ $$
     \qquad 
     \begin{cases}
     p_x(t)= p_\perp \cos (\omega t -\alpha)\\
-    p_y(t)= p_\perp \sin (\omega t -\alpha)\\
+    p_y(t)= -p_\perp \sin (\omega t -\alpha)\\
     p_z(t)= p_{z0}
     \end{cases} 
 $$
@@ -744,7 +744,7 @@ def bend_particle (positions, momenta, meters):
                                ), axis=1)    
     final_position += positions #sum initial position
     
-    final_momentum = np.stack((p_pe * np.cos(wt - alpha), p_pe * np.sin(wt - alpha), momenta[:,2]), axis=1)
+    final_momentum = np.stack((p_pe * np.cos(wt - alpha), -p_pe * np.sin(wt - alpha), momenta[:,2]), axis=1)
     
     return final_position, final_momentum
 
