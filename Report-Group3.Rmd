@@ -664,10 +664,11 @@ So, for each batch:
 num_samples = int(1e5)
 
 #Let's fix the center sqrt(s) at 230MeV. The E+ has a width of 0.5 GeV, that corresponds to a width of s equal to:
-sigma_mu = 0.1 * 1e3 #0.5 GeV 
+sigma_mu = 0.5 * 1e3 #0.5 GeV 
 sigma_s  = 2 * me * (sigma_mu + me) 
 
-s_vec = np.random.normal(213**2, sigma_s, size=num_samples)
+#since the width is very large we need to check for values under the threshold 
+s_vec   = np.array([x for x in np.random.normal(213**2, sigma_s, size=num_samples*2) if x > 4*mmu**2])[0:num_samples]
 
 momenta = generate_nonmonochromatic(s_vec)
 ```
