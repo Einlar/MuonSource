@@ -773,7 +773,10 @@ def bend_particle (positions, momenta, meters):
     assert len(positions) == len(momenta), "Positions and momenta must be of the same length"
     assert len(positions.shape) == len(momenta.shape) == 2, "Positions and momenta must be matrices"
     
-    p_norm_sq = np.sum(np.square(momenta), axis=1) #|p|^2 in [Mev^2/c^2]
+    #theoreticcaly we do not set a bound to how many columns the momenta has
+    #in particular we provide a matrix with 6 columns but we consider only the first 3 since 
+    #the 2 triplets are particle-antiparticle
+    p_norm_sq = np.sum(np.square(momenta)[:,:3], axis=1) #|p|^2 in [Mev^2/c^2]
     
     cc = 2.99792458e2 #to reduce numerical errors (=c/1e6)
     
@@ -819,8 +822,8 @@ def free_particle(positions, momenta, meters):
     final_position : ndarray of size (N,3)
        Final positions for the particles [m]
     """
-    
-    p_norm_sq = np.sum(np.square(momenta), axis=1) #|p|^2 in [Mev^2/c^2]
+    #consider only first 3 columns as before
+    p_norm_sq = np.sum(np.square(momenta[:,:3]), axis=1) #|p|^2 in [Mev^2/c^2]
     gamma = np.sqrt(p_norm_sq + mmu**2) / mmu
     
     velox = momenta * c / (mmu * gamma[..., np.newaxis])
@@ -907,7 +910,7 @@ plt.show()
 #Linear propagation after the magnet
 ff_pos = free_particle(f_pos, f_mom, 6)
 
-#and plot
+#and plot 
 fig, fig1=plt.subplots(1, 1, figsize=(6,6))
 fig1.hist2d(ff_pos[:,1] * 100, ff_pos[:,2] * 100, bins=50)
 fig1.set_title("Non Monochromatic Beam After Free Propagation")
