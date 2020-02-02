@@ -838,7 +838,7 @@ Now using the previous defined Monte Carlo generator of events we can observe th
 #Magnet deflection
 fig, ax = plt.subplots(1, 1, figsize=(8, 5))
 
-sns.distplot(np.sqrt(dist_s), ax = ax, bins = int(np.sqrt(num_samples)), 
+sns.distplot(np.sqrt(dist_s[dist_s > 4*(mmu**2)]), ax = ax, bins = int(np.sqrt(num_samples)), 
                     kde_kws  = {'color': 'darkblue',   'label': 'KDE'},
                     hist_kws = {'color': 'darkorange', 'alpha': 0.7, 'linewidth': 1, 'histtype':'barstacked', 'label': 'Hist'})
 
