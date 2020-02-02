@@ -34,8 +34,8 @@ The main goal of this project is to produce a Monte Carlo simulation for the sca
 
 In the following, all quantities denoted with a star ($^*$) are measured in the center of mass (CM) frame of reference, while quantities without it refer to the laboratory frame. Also, $c=1$ for all computations.
 
-The leading-order **differential cross-section** for the unpolarized scattering $e^+ + e^- \to \mu^+ + \mu^-$ in the CM frame has the following expression [[1]](#quotes.diffcross), as function of the total energy $\sqrt{s}$ in the CM frame, and the emission angles $\theta^*$ and $\Omega^*$:
-$$\frac{\mathrm{d}\sigma^*}{\mathrm{d}\Omega^*}(\sqrt{s},\theta^*, \varphi^*) = \frac{\alpha^2}{4s} \left(1- \frac{4 m_\mu^2}{s}\right)^{1/2} \left(1- \frac{4 m_e^2}{s}\right)^{-1/2}\left( 1+ \frac{4}{s} (m_e^2 + m_\mu^2) + \left(1-\frac{4 m_e^2}{s}\right)\left(1-\frac{4 m_\mu^2}{s}\right)\cos^2\theta^*\right) \label{eqn:diff-cross}\tag{1.1}$$
+The leading-order **differential cross-section** for the unpolarized scattering $e^+ + e^- \to \mu^+ + \mu^-$ in the CM frame has the following expression [[1]](#quotes.diffcross), as function of the total energy $\sqrt{s}$ in the CM frame, and the emission angles $\theta^*$ and $\varphi^*$:
+$$\frac{\mathrm{d}\sigma^*}{\mathrm{d}\Omega^*}(\sqrt{s},\theta^*, \varphi^*) = \frac{\alpha^2}{4s} \left(1- \frac{4 m_\mu^2}{s}\right)^{1/2} \left(1- \frac{4 m_e^2}{s}\right)^{-1/2}\left[ 1+ \frac{4}{s} (m_e^2 + m_\mu^2) + \left(1-\frac{4 m_e^2}{s}\right)\left(1-\frac{4 m_\mu^2}{s}\right)\cos^2\theta^*\right] \label{eqn:diff-cross}\tag{1.1}$$
 Integration over the sphere leads to the **total cross section**:
 $$\sigma^*(\sqrt{s}) = \int_0^\pi \sin\theta^* \mathrm{d}\theta^* \int_0^{2\pi} {\rm d}\varphi^* \frac{\mathrm{d}\sigma^*}{\mathrm{d}\Omega^*}(\sqrt{s},\theta^*,\varphi^*) = \frac{4\pi \alpha^2}{3 s^3} \frac{\sqrt{1-\frac{4 m_\mu^2}{s}}}{\sqrt{1-\frac{4 m_e^2}{s}}} (2 m_e^2 + s)(2m_\mu^2 + s) \label{eqn:cross}\tag{1.2}$$
 
@@ -251,7 +251,7 @@ plt.show()
 ## c. Momenta (CM)
 
 
-For every event, two muons are generated, with opposite angles $\theta^*_1 = -\theta^*_2$ and $\varphi^*_1 = - \varphi^*_2$. By symmetry, the distribution of their $3$-momentum components are the same. Also, as the process is cylindrically symmetric, the distributions for $p_y^*$ and $p_z^*$ are the same.
+For every event, two muons are generated, with opposite angles $\theta^*_2 = \theta^*_1 - \pi$ and $\varphi^*_2 = 2\pi - \varphi^*_1$. By symmetry, the distribution of their $3$-momentum components are the same. Also, as the process is cylindrically symmetric, the distributions for $p_y^*$ and $p_z^*$ are the same.
 
 ```{python}
 #Momentum CM
@@ -425,8 +425,8 @@ np.savetxt("Momenta_monochromatic.txt", events) #save to file
 Let $f_+$ be the rate of positrons on target. Then, the rate $f_\mu$ of muon pairs produced by the interaction is given by:
 $$f_\mu =  f_+ \rho^- l_t \sigma $$
 where $\rho^-$ is the electron density in the medium, $l_t$ is the thickness of the target, and $\sigma$ is the total cross section for the $e^+ e^- \to \mu^+ \mu^-$ interaction. $\rho^-$ can be computed as:
-$$ \rho^- = N_A \frac{\rho}{M_t} Z $$
-with $\rho$ being the target's density, $M_t$ its molar mass, and $Z$ its atomic number.
+$$ \rho^- = N_A \frac{\rho_{\mathrm{Be}}}{M_t} Z $$
+with $\rho_{\mathrm{Be}}$ being the target's density, $M_t$ its molar mass, and $Z$ its atomic number.
 
 So, if we generate $N$ events, the correct statistics for an experiment lasting $\Delta T$ can be computed by rescaling histograms by a factor $f_\mu \Delta T / N$.
 
@@ -463,7 +463,7 @@ g(y,z; r) =
     0 & \text{otherwise}
 \end{cases}
 \qquad
-h(\mathcal{E}; \mu,\sigma) = \dfrac{1}{\sqrt{2\pi}\sigma} \exp\left({ - \dfrac{(\mathcal{E}-\mu)^2}{2\sigma^2} }\right)
+h(\mathcal{E}; \mu,\sigma) = \dfrac{1}{\sqrt{2\pi}\sigma} \exp\left[{ - \dfrac{(\mathcal{E}-\mu)^2}{2\sigma^2} }\right]
 \label{eqn:hg-dist}\tag{4.1}
 $$
 
@@ -533,16 +533,17 @@ ys, zs = generate_yz(num_samples, 1) #without batches it would take >17s
 #Check the uniformity
 plt.figure(figsize=(6,6))
 plt.scatter(ys,zs,s=0.00001)
-plt.xlabel('y')
-plt.ylabel('z')
+plt.xlabel('y [cm]')
+plt.ylabel('z [cm]')
 plt.show()
 ```
 
 $h(\mathcal{E},\mu,\sigma)$, on the other hand, is just a gaussian distribution, and can be sampled directly from NumPy functions.
 
 ```{python}
-Es     = np.random.normal(50, .5, size = num_samples)   #Consider a (50.0 +- .5)GeV beam
-dist_s = 2 * me * Es #get distribution of s
+Es     = np.random.normal(45, .5, size = num_samples*2)   #Consider a (50.0 +- .5)GeV beam
+#generate more than num_samples, as some of them may be under threshold
+dist_s = 2 * me * Es * 1000 #get distribution of s (in MeV^2)
 ```
 
 ## 4.2. Distribution $g(\theta^*,s)$
@@ -552,7 +553,7 @@ As the cross-section depends on $s$, the angular distribution of a non-monochrom
 
 ```{python}
 ths  = np.linspace(0,np.pi,1000)
-sqs  = np.linspace(np.min(dist_s),np.max(dist_s),1000)
+sqs  = np.linspace(np.sqrt(np.min(dist_s)),np.sqrt(np.max(dist_s)),1000)
 thsv, sqsv = np.meshgrid(ths,sqs)
 thsv = thsv.reshape(-1,)
 sqsv = sqsv.reshape(-1,)
@@ -660,17 +661,8 @@ So, for each batch:
 
 
 ```{python}
-#Generate 10^5 samples for the non-monochromatic beam
-num_samples = int(1e5)
-
-#Let's fix the center sqrt(s) at 230MeV. The E+ has a width of 0.5 GeV, that corresponds to a width of s equal to:
-sigma_mu = 0.5 * 1e3 #0.5 GeV 
-sigma_s  = 2 * me * (sigma_mu + me) 
-
-#since the width is very large we need to check for values under the threshold 
-s_vec   = np.array([x for x in np.random.normal(213**2, sigma_s, size=num_samples*2) if x > 4*mmu**2])[0:num_samples]
-
-momenta = generate_nonmonochromatic(s_vec)
+#since the width is significant we need to check for values under the threshold 
+momenta = generate_nonmonochromatic((dist_s[dist_s > 4*(mmu**2)])[:num_samples])
 ```
 
 In the non-monochromatic case, as the cross-section does not vary significantly in the examined energy range, the momenta distributions (in the laboratory frame) appear very similar to that of the monochromatic beam. One difference of interest is given by the more gradual fall-off at the edges: this is because the final distribution is a weighted average of many monochromatic distributions of different ranges.
@@ -700,7 +692,7 @@ plt.show()
 <div style="text-align: right"><a href="#Report.index">Return to index</a></div>
 
 
-Let's compute the variation in the the trajectory induced by the presence of a magnet, each particle is identified by it's position at the end of the berillium block and it's tri-momentum at the exit.
+Let's compute the variation in the the trajectory induced by the presence of a magnet, each particle is identified by it's position at the end of the berillium block and it's $3$-momentum at the exit.
 
 Consider a particle with initial position $\mathbf{x}_0 = (x_0, y_0, z_0)^T$ and velocity $\mathbf{v}_0 = (v_{0x}, v_{0y}, v_{0z})^T$ in the laboratory frame, moving inside a magnetic field $\mathbf{B} = (0,0,B)^T$. The solution of the equation of motion is given by:
 $$ 
@@ -844,17 +836,9 @@ Now using the previous defined Monte Carlo generator of events we can observe th
 
 ```{python}
 #Magnet deflection
-num_samples = int(1e5)
-
-#since i wanto 1e5 events but some of them may be under the threshold of the u-u+ 
-# production i need to generate more (the double just to be sure)
-#and select the first 1e5 throught a mask
-s_vec   = np.array([x for x in np.random.normal(213**2, sigma_s, size=num_samples*2) if x > 4*mmu**2])[0:num_samples]
-momenta = generate_nonmonochromatic(s_vec) #Generate non-monochromatic events
-
 fig, ax = plt.subplots(1, 1, figsize=(8, 5))
 
-sns.distplot(np.sqrt(s_vec), ax = ax, bins = int(np.sqrt(num_samples)), 
+sns.distplot(np.sqrt(dist_s), ax = ax, bins = int(np.sqrt(num_samples)), 
                     kde_kws  = {'color': 'darkblue',   'label': 'KDE'},
                     hist_kws = {'color': 'darkorange', 'alpha': 0.7, 'linewidth': 1, 'histtype':'barstacked', 'label': 'Hist'})
 
@@ -871,8 +855,9 @@ $$
 
 
 ```{python}
+s = 218**2
 th_max = 4 * me * np.sqrt(s/4 - mmu) / s
-print("Maximum angle at ", 216, "MeV: ", th_max, "rad")
+print("Maximum angle at ", np.sqrt(s), "MeV: ", th_max, "rad")
 print("Maximum deviation: ", 6*math.sin(th_max), "cm")
 ```
 
@@ -922,11 +907,12 @@ It's clearly visible how the beam is still concentrated in an almost well define
 
 ```{python}
 #non monochromatic beam
-NonMono_s = np.array([x for x in np.random.normal(213**2, sigma_s, size=num_samples*2) if x > 4*mmu**2])[0:num_samples] #Generate energies
-NonMono_momenta = generate_nonmonochromatic(NonMono_s) #Generate non-monochromatic events
+#nonMono_Es = np.random.normal(45, .5, size=num_samples*2) 
+#NonMono_s = np.array([x for x in np.random.normal(213**2, sigma_s, size=num_samples*2) if x > 4*mmu**2])[0:num_samples] #Generate energies
+#NonMono_momenta = generate_nonmonochromatic(NonMono_s) #Generate non-monochromatic events
 
 #monochromatic beam
-Mono_momenta= generate_monochromatic(213, num_samples)
+Mono_momenta= generate_monochromatic(np.sqrt(np.mean(dist_s)), num_samples)
 
 #we can use the same starting position for the 2 beams and see how they evolve
 x = np.zeros(num_samples) 
@@ -948,7 +934,7 @@ nmFig.set_ylabel("Z [cm]")
 
 ```{python}
 #let's make them evolve 2 meters inside the magnet and see how they look 
-NonMono_BendedPos, NonMono_BendedMom = bend_particle(positions, NonMono_momenta, 2)
+NonMono_BendedPos, NonMono_BendedMom = bend_particle(positions, momenta, 2)
 Mono_BendedPos, Mono_BendedMom = bend_particle(positions, Mono_momenta, 2)
 
 #plot after magnet
@@ -962,6 +948,8 @@ nmFig2.hist2d(NonMono_BendedPos[:,1]*100, NonMono_BendedPos[:,2]*100, bins=50)
 nmFig2.set_title("Non Monochromatic Beam After Magnet")
 nmFig2.set_xlabel("Y [cm]")
 nmFig2.set_ylabel("Z [cm]")
+
+plt.show()
 ```
 
 ```{python}
@@ -1008,7 +996,7 @@ y_babayaga  = (babayaga_el_th[1][1:] + babayaga_el_th[1][:-1]) / 2
 
 plt.plot(x_babayaga, y_babayaga/normalization, linewidth=2.5, label="Babayaga")
 plt.xlabel(r'$\theta^*$ [rad]')
-plt.ylabel(r'Density')
+plt.ylabel(r'PDF')
 plt.title(r'Distribution of $\theta^*$')
 plt.legend()
 
